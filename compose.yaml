@@ -1,0 +1,113 @@
+name: urbanalert-multimedia
+
+x-storage-env: &storage-env
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-urbanalert}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-urbanalert-dev-secret}
+  AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3:-http://minio:9000}
+  S3_ADDRESSING_STYLE: ${S3_ADDRESSING_STYLE:-path}
+  MONGODB_URI: ${MONGODB_URI:-mongodb://urbanalert:urbanalert-dev-secret@mongo:27017/?authSource=admin}
+  MONGODB_TIMEOUT_MS: ${MONGODB_TIMEOUT_MS:-3000}
+  MONGODB_MAX_POOL_SIZE: ${MONGODB_MAX_POOL_SIZE:-5}
+  MAX_IMAGE_BYTES: ${MAX_IMAGE_BYTES:-3670016}
+  MULTIPART_OVERHEAD_BYTES: ${MULTIPART_OVERHEAD_BYTES:-65536}
+  STORAGE_CONNECT_TIMEOUT_S: ${STORAGE_CONNECT_TIMEOUT_S:-2}
+  STORAGE_READ_TIMEOUT_S: ${STORAGE_READ_TIMEOUT_S:-5}
+  STORAGE_MAX_ATTEMPTS: ${STORAGE_MAX_ATTEMPTS:-3}
+  ENABLE_DOCS: ${ENABLE_DOCS:-false}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-app-env: &app-env
+  <<: *storage-env
+  S3_BUCKET: ${S3_BUCKET:-urbanalert-images}
+  PUBLIC_IMAGE_BASE_URL: ${PUBLIC_IMAGE_BASE_URL:-http://localhost:9000/urbanalert-images}
+  MONGODB_DATABASE: ${MONGODB_DATABASE:-multimedia}
+
+services:
+  minio:
+    # MinIO withdrew its official images (Docker Hub and Quay); Chainguard builds it daily from source
+    # (plan D-004, research R-1). Free tier only offers the "latest" tag.
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanalert}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-urbanalert-dev-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongo:
+    image: docker.io/library/mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-urbanalert}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-urbanalert-dev-secret}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  init:
+    # One-off admin process with the same image (plan D-010): bucket, policy and indexes.
+    build:
+      context: .
+      target: runtime
+    entrypoint: ["python", "-m", "app.admin.init_resources"]
+    environment:
+      <<: *app-env
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  multimedia:
+    build:
+      context: .
+      target: runtime
+    environment:
+      <<: *app-env
+      # Read by the RIE: mirror the Lambda governance limits (512 MB, 15 s).
+      AWS_LAMBDA_FUNCTION_TIMEOUT: "15"
+      AWS_LAMBDA_FUNCTION_MEMORY_SIZE: "512"
+    ports:
+      - "9010:8080"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+    environment:
+      <<: *storage-env
+      S3_BUCKET: urbanalert-images-test
+      PUBLIC_IMAGE_BASE_URL: http://minio:9000/urbanalert-images-test
+      MONGODB_DATABASE: multimedia_test
+      MULTIMEDIA_INVOKE_URL: http://multimedia:8080/2015-03-31/functions/function/invocations
+    depends_on:
+      minio:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      multimedia:
+        condition: service_started
+
+volumes:
+  minio-data:
+  mongo-data:

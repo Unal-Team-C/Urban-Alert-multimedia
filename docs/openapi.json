@@ -1,0 +1,338 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UrbanAlert Multimedia",
+    "description": "Stores photographic evidence and returns its definitive URL.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/multimedia/images": {
+      "post": {
+        "tags": [
+          "multimedia"
+        ],
+        "summary": "UploadImage",
+        "description": "Stores a JPEG or PNG image (max 3,670,016 bytes) with optional capture data and returns its definitive URL. Embedded metadata (EXIF, XMP, IPTC) is removed; only the orientation is kept.",
+        "operationId": "upload_image_api_v1_multimedia_images_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_image_api_v1_multimedia_images_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/multimedia/images/{imageId}/metadata": {
+      "get": {
+        "tags": [
+          "multimedia"
+        ],
+        "summary": "GetImageMetadata",
+        "description": "Returns the metadata of a stored image. The image itself is read from its imageUrl.",
+        "operationId": "get_image_metadata_api_v1_multimedia_images__imageId__metadata_get",
+        "parameters": [
+          {
+            "name": "imageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Image id (UUID) returned by UploadImage",
+              "title": "Imageid"
+            },
+            "description": "Image id (UUID) returned by UploadImage"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_image_api_v1_multimedia_images_post": {
+        "properties": {
+          "image": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Image",
+            "description": "JPEG or PNG image"
+          },
+          "capturedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturedat",
+            "description": "ISO 8601 with UTC offset"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat",
+            "description": "Capture latitude, sent together with lon"
+          },
+          "lon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon",
+            "description": "Capture longitude, sent together with lat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image"
+        ],
+        "title": "Body_upload_image_api_v1_multimedia_images_post"
+      },
+      "Capture": {
+        "properties": {
+          "capturedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturedat"
+          },
+          "coordinate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coordinate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "capturedAt",
+          "coordinate"
+        ],
+        "title": "Capture"
+      },
+      "Coordinate": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "title": "Coordinate"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "reason"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse"
+      },
+      "ImageResponse": {
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Imageid"
+          },
+          "imageUrl": {
+            "type": "string",
+            "title": "Imageurl"
+          },
+          "contentType": {
+            "type": "string",
+            "title": "Contenttype"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "title": "Sizebytes"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Uploadedat"
+          },
+          "capture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Capture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "imageId",
+          "imageUrl",
+          "contentType",
+          "sizeBytes",
+          "uploadedAt",
+          "capture"
+        ],
+        "title": "ImageResponse"
+      }
+    }
+  }
+}

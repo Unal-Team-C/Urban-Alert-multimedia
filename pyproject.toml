@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: needs MinIO and MongoDB running",
+    "e2e: needs the multimedia container (RIE) running",
+]
