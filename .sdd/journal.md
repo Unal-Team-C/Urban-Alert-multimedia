@@ -100,3 +100,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T012 hecha
 - infra/rutas: integración AWS_PROXY (payload 2.0, invoke ARN de la función api leída de servicio), rutas NONE 'POST /api/v1/multimedia/images' y 'GET /api/v1/multimedia/images/{imageId}/metadata', aws_lambda_permission (apigateway.amazonaws.com, source_arn <api-execution-arn>/*/*/api/v1/multimedia/*), salida gateway_url desde SSM.
 - Verificado: validate, fmt, 3/3 runs.
+
+## 2026-10-11 · 002-despliegue-aws · T013 hecha
+- scripts/check-platform.sh (copia de Geoespacial con referencias ajustadas), run-init.sh (espera active/updated, invoke con --log-type Tail, muestra log y respuesta, falla con FunctionError), smoke-gateway-multimedia.sh (404 propio del servicio 'Image not found' para un UUID aleatorio con 6 reintentos, /docs 404, CloudFront / 403, S3 directo 403; no escribe datos).
+- Verificado: bash -n y shellcheck v0.10.0 sin avisos sobre scripts/*.sh.

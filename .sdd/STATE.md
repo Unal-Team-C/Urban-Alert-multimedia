@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T013
+tarea_actual: T014
 estado_tarea: -
 
 ## Siguiente paso
 
-T013: scripts/check-platform.sh (copia de Geoespacial), scripts/run-init.sh (invoke con --log-type Tail, falla con FunctionError) y scripts/smoke-gateway-multimedia.sh (404 del servicio para UUID aleatorio, /docs 404, CloudFront / 403, S3 directo 403); shellcheck.
+T014: escribir .github/workflows/provision.yml (push a main; jobs test → package → provision en el orden de plan §4.3; concurrencia urban-alert-multimedia-aws; OIDC).
 
 ## Contexto de trabajo
 
