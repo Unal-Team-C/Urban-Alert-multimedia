@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T012
+tarea_actual: T013
 estado_tarea: -
 
 ## Siguiente paso
 
-T012: crear infra/rutas (integración AWS_PROXY 2.0 hacia la función api, 2 rutas NONE, aws_lambda_permission con source_arn /*/*/api/v1/multimedia/*, salida gateway_url de SSM) y tests/rutas.tftest.hcl.
+T013: scripts/check-platform.sh (copia de Geoespacial), scripts/run-init.sh (invoke con --log-type Tail, falla con FunctionError) y scripts/smoke-gateway-multimedia.sh (404 del servicio para UUID aleatorio, /docs 404, CloudFront / 403, S3 directo 403); shellcheck.
 
 ## Contexto de trabajo
 
