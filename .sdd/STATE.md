@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T014
+tarea_actual: T015
 estado_tarea: -
 
 ## Siguiente paso
 
-T014: escribir .github/workflows/provision.yml (push a main; jobs test → package → provision en el orden de plan §4.3; concurrencia urban-alert-multimedia-aws; OIDC).
+T015: escribir .github/workflows/deprovision.yml (workflow_dispatch con confirm=urban-alert-multimedia y main; rutas → servicio (zip vacío) → base con allow_destroy + suffix=run_id y destroy; nunca almacen; resumen).
 
 ## Contexto de trabajo
 

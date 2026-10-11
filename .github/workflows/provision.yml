@@ -1,0 +1,200 @@
+# Provisioning (spec 002, RF-010): every push to main (a merged pull request) tests, packages, provisions and deploys.
+# Order (plan §4.3): tests → package → platform check → almacen → base → servicio → init → rutas → smoke → summary.
+# The functions run in the private network of the shared platform (Unal-Team-C/urban-alert-plataforma) and are
+# reachable only through its API Gateway.
+name: Provision
+
+on:
+  push:
+    branches: [main]
+
+# Shared with deprovision.yml: runs touching the same infrastructure queue up instead of overlapping (RF-014).
+concurrency:
+  group: urban-alert-multimedia-aws
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TF_VERSION: 1.16.5
+  TF_IN_AUTOMATION: "true"
+  PACKAGE: build/multimedia.zip
+
+jobs:
+  test:
+    name: Tests and static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Unit tests
+        run: |
+          pip install -r requirements-dev.txt
+          pytest tests/unit
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform format
+        run: terraform fmt -check -recursive infra
+
+      - name: Terraform validate and test (mocked providers)
+        run: |
+          for stack in almacen base servicio rutas; do
+            terraform -chdir="infra/$stack" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="infra/$stack" validate
+            terraform -chdir="infra/$stack" test
+          done
+
+      - name: Lint workflows
+        run: docker run --rm -v "$PWD:/repo" -w /repo docker.io/rhysd/actionlint:1.7.7 -color
+
+      - name: Lint scripts
+        run: docker run --rm -v "$PWD:/mnt" -w /mnt docker.io/koalaman/shellcheck:v0.10.0 scripts/*.sh
+
+  package:
+    name: Build the Lambda package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build (deterministic .zip, at most 50 MB)
+        id: build
+        run: |
+          scripts/build-lambda-zip.sh "$PACKAGE" | tee build.log
+          echo "line=$(tail -n 1 build.log)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lambda-package
+          path: ${{ env.PACKAGE }}
+          if-no-files-found: error
+          retention-days: 7
+
+    outputs:
+      line: ${{ steps.build.outputs.line }}
+
+  provision:
+    name: Provision and deploy
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC: temporary AWS credentials, no stored keys (RF-013)
+    env:
+      COMMIT: ${{ github.sha }}
+      PLANS: ${{ github.workspace }}/plans.txt
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: lambda-package
+          path: build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check the shared platform is provisioned (nothing is changed before this)
+        run: scripts/check-platform.sh
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Apply almacen (S3 + CloudFront; persistent, never destroyed)
+        id: almacen
+        run: |
+          terraform -chdir=infra/almacen init -input=false
+          terraform -chdir=infra/almacen plan -input=false -no-color -out=tfplan | tee plan.txt
+          echo "almacen: $(grep -E '^(Plan:|No changes)' plan.txt)" >> "$PLANS"
+          terraform -chdir=infra/almacen apply -input=false tfplan
+          {
+            echo "bucket=$(terraform -chdir=infra/almacen output -raw bucket_name)"
+            echo "cdn_url=$(terraform -chdir=infra/almacen output -raw cdn_url)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply base (DocumentDB, secret, security groups, roles, logs)
+        run: |
+          terraform -chdir=infra/base init -input=false
+          terraform -chdir=infra/base plan -input=false -no-color -out=tfplan | tee plan.txt
+          echo "base: $(grep -E '^(Plan:|No changes)' plan.txt)" >> "$PLANS"
+          terraform -chdir=infra/base apply -input=false tfplan
+
+      - name: Apply servicio (Lambda functions with the package of this commit)
+        id: servicio
+        run: |
+          terraform -chdir=infra/servicio init -input=false
+          terraform -chdir=infra/servicio plan -input=false -no-color -out=tfplan \
+            -var "paquete_zip=$GITHUB_WORKSPACE/$PACKAGE" -var "commit=$COMMIT" | tee plan.txt
+          echo "servicio: $(grep -E '^(Plan:|No changes)' plan.txt)" >> "$PLANS"
+          terraform -chdir=infra/servicio apply -input=false tfplan
+          echo "init_function=$(terraform -chdir=infra/servicio output -raw init_function_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Create the DocumentDB indexes (init function, inside the private network)
+        env:
+          FUNCTION: ${{ steps.servicio.outputs.init_function }}
+        run: scripts/run-init.sh "$FUNCTION"
+
+      - name: Apply rutas (publish the routes in the shared API Gateway)
+        id: rutas
+        run: |
+          terraform -chdir=infra/rutas init -input=false
+          terraform -chdir=infra/rutas plan -input=false -no-color -out=tfplan | tee plan.txt
+          echo "rutas: $(grep -E '^(Plan:|No changes)' plan.txt)" >> "$PLANS"
+          terraform -chdir=infra/rutas apply -input=false tfplan
+          echo "gateway=$(terraform -chdir=infra/rutas output -raw gateway_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test through the gateway and CloudFront
+        env:
+          GATEWAY: ${{ steps.rutas.outputs.gateway }}
+          CDN_URL: ${{ steps.almacen.outputs.cdn_url }}
+          BUCKET: ${{ steps.almacen.outputs.bucket }}
+          REGION: ${{ vars.AWS_REGION }}
+        run: scripts/smoke-gateway-multimedia.sh "$GATEWAY" "$CDN_URL" "$BUCKET" "$REGION"
+
+      - name: Summary
+        if: always()
+        env:
+          GATEWAY: ${{ steps.rutas.outputs.gateway }}
+          CDN_URL: ${{ steps.almacen.outputs.cdn_url }}
+          PACKAGE_LINE: ${{ needs.package.outputs.line }}
+        run: |
+          {
+            echo "### Servicio Multimedia"
+            echo "- Commit: \`$COMMIT\`"
+            echo "- Paquete: ${PACKAGE_LINE:-–}"
+            if [ -n "$GATEWAY" ]; then
+              echo "- Subir: \`POST $GATEWAY/api/v1/multimedia/images\`"
+              echo "- Metadatos: \`GET $GATEWAY/api/v1/multimedia/images/{imageId}/metadata\`"
+            else
+              echo "- Rutas del gateway: (no disponibles)"
+            fi
+            echo "- URL base de las imágenes: ${CDN_URL:-–}"
+            echo
+            echo "Planes:"
+            echo '```'
+            cat "$PLANS" 2>/dev/null || echo "(ninguno)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

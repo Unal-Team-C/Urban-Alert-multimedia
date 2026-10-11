@@ -104,3 +104,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T013 hecha
 - scripts/check-platform.sh (copia de Geoespacial con referencias ajustadas), run-init.sh (espera active/updated, invoke con --log-type Tail, muestra log y respuesta, falla con FunctionError), smoke-gateway-multimedia.sh (404 propio del servicio 'Image not found' para un UUID aleatorio con 6 reintentos, /docs 404, CloudFront / 403, S3 directo 403; no escribe datos).
 - Verificado: bash -n y shellcheck v0.10.0 sin avisos sobre scripts/*.sh.
+
+## 2026-10-11 · 002-despliegue-aws · T014 hecha
+- .github/workflows/provision.yml: push a main; job test (pytest tests/unit con Python 3.13, fmt/validate/test de los 4 stacks con -lockfile=readonly, actionlint, shellcheck) → package (build-lambda-zip.sh, artefacto lambda-package) → provision (OIDC; check-platform → almacen → base → servicio con paquete_zip/commit → run-init → rutas → smoke → resumen con planes, rutas, URL de imágenes y paquete). Cada stack hace plan -out y apply del plan, y anota su línea 'Plan:' en el resumen. Concurrencia urban-alert-multimedia-aws sin cancelación.
+- Verificado: actionlint 1.7.7 sin avisos; pasos en el orden de plan §4.3.
