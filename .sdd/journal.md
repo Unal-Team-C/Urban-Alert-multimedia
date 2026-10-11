@@ -112,3 +112,8 @@
 ## 2026-10-11 · 002-despliegue-aws · T015 hecha
 - .github/workflows/deprovision.yml: workflow_dispatch con confirm = urban-alert-multimedia y solo en main; rutas destroy → servicio destroy (zip vacío de marcador) → base apply allow_destroy + final_snapshot_suffix=run_id → base destroy; stacks vacíos se informan y se saltan; resumen con el estado de cada stack, la copia final y que S3/CloudFront se conservan. Misma concurrencia que Provision.
 - Verificado: actionlint sin avisos; 'almacen' solo aparece en el resumen (el workflow nunca ejecuta ese stack).
+
+## 2026-10-11 · 002-despliegue-aws · T016 hecha
+- README.md reescrito para AWS: cómo funciona (S3/CloudFront/DocumentDB/gateway), contrato con <gateway> y ejemplo curl, 403 de CloudFront para URL inexistente, despliegue (arquitectura, stacks, workflows, orden de levantamiento con motivos, primera vez, secretos/variables de GitHub con ejemplo, configuración de la función, presupuesto de conexiones, costes, restauración manual de la copia de DocumentDB, validación local con Podman), estructura y entorno local marcado como no mantenido.
+- infra/INVENTARIO.md: recursos por stack, recursos de arranque (incluida la política nueva) y plataforma.
+- Verificado: cubre cada punto de RF-015; grep de password/secret_string sin coincidencias.

@@ -50,7 +50,7 @@ Atajos de verificación (Podman, desde la raíz del repo; ver plan §2):
 
 ## Fase 5: Pulido
 
-- [ ] T016 Actualizar el README (despliegue en AWS: arquitectura, orden de levantamiento y desmontaje, workflows, rutas publicadas, configuración en la nube, tabla de costes, restauración de la copia de DocumentDB, diferencia 403/404; lo local se marca como no mantenido) y crear `infra/INVENTARIO.md` — archivos: README.md, infra/INVENTARIO.md — cubre: RF-015, RNF-006 — verifica: cada sección de RF-015 presente; sin valores secretos (`grep -iE "password|secret_string"` solo en textos explicativos)
+- [x] T016 Actualizar el README (despliegue en AWS: arquitectura, orden de levantamiento y desmontaje, workflows, rutas publicadas, configuración en la nube, tabla de costes, restauración de la copia de DocumentDB, diferencia 403/404; lo local se marca como no mantenido) y crear `infra/INVENTARIO.md` — archivos: README.md, infra/INVENTARIO.md — cubre: RF-015, RNF-006 — verifica: cada sección de RF-015 presente; sin valores secretos (`grep -iE "password|secret_string"` solo en textos explicativos)
 - [ ] T017 Validación completa local antes de entregar (`PYTEST`, `TF` de los 4 stacks, `fmt`, `LINT`, doble build del .zip) y lista de comprobaciones en AWS para `/sdd-verify` — archivos: specs/002-despliegue-aws/notes.md — cubre: RNF-003, RNF-004, RNF-005 — verifica: todos los comandos en verde; la lista cubre HU-1…HU-4 y el ciclo Deprovision → Provision (HU-2 #8)
 
 ## Correcciones de verificación

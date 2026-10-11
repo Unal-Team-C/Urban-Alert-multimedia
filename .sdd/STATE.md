@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T016
+tarea_actual: T017
 estado_tarea: -
 
 ## Siguiente paso
 
-T016: actualizar README.md (sección de AWS: arquitectura, orden, workflows, rutas, configuración en la nube, costes, restauración, 403 vs 404; lo local como no mantenido) y crear infra/INVENTARIO.md.
+T017: validación completa local (PYTEST, TF de los 4 stacks, fmt, LINT, doble build del .zip) y lista de comprobaciones en AWS en notes.md para /sdd-verify.
 
 ## Contexto de trabajo
 
