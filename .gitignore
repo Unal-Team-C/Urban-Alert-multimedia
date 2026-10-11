@@ -1,3 +1,7 @@
 .sdd/activity.log
 .claude/settings.local.json
 .claude/settings.json.bak-sdd
+build/
+.terraform/
+*.tfplan
+tfplan

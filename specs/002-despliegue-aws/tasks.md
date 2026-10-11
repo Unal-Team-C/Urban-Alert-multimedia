@@ -19,7 +19,7 @@ Atajos de verificación (Podman, desde la raíz del repo; ver plan §2):
 ## Fase 1: Preparación
 
 - [x] T001 Versionar la política de bootstrap y documentar los pasos manuales (crear la política, adjuntarla al rol, límite de concurrencia supuesto de 10) — archivos: infra/bootstrap/github-multimedia-policy.json, infra/bootstrap/README.md — cubre: RF-013, RF-015 — verifica: `python3 -m json.tool infra/bootstrap/github-multimedia-policy.json` sin errores y contenido idéntico al Anexo A del plan
-- [ ] T002 [P] Ignorar `build/` y `.terraform/` en git — archivos: .gitignore — cubre: RF-009 — verifica: `git check-ignore build/x infra/base/.terraform` imprime ambas rutas
+- [x] T002 [P] Ignorar `build/` y `.terraform/` en git — archivos: .gitignore — cubre: RF-009 — verifica: `git check-ignore build/x infra/base/.terraform` imprime ambas rutas
 
 ## Fase 2: Pruebas (antes del código)
 

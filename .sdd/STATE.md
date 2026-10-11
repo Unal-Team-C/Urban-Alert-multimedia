@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T002
-estado_tarea: hecha
+tarea_actual: T003
+estado_tarea: -
 
 ## Siguiente paso
 
-T002: añadir build/ y .terraform/ a .gitignore; verificar con git check-ignore build/x infra/base/.terraform.
+T003: escribir tests/unit/test_metadata_uri.py y ampliar test_config_logging.py (MONGODB_URI_SECRET_ARN); deben fallar solo por falta de resolve_uri.
 
 ## Contexto de trabajo
 

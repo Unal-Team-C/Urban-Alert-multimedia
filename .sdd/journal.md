@@ -55,3 +55,6 @@
 ## 2026-10-11 · 002-despliegue-aws · T001 hecha
 - infra/bootstrap/github-multimedia-policy.json (Anexo A del plan, sin CreateDistributionWithTags) e infra/bootstrap/README.md (recursos compartidos, crear/adjuntar/actualizar la política, límite de concurrencia supuesto de 10, cómo comprobar).
 - Verificado: `python3 -m json.tool` válido; JSON idéntico al Anexo A.
+
+## 2026-10-11 · 002-despliegue-aws · T002 hecha
+- .gitignore: build/, .terraform/, planes de Terraform. Verificado con git check-ignore.
