@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T015
+tarea_actual: T016
 estado_tarea: -
 
 ## Siguiente paso
 
-T015: escribir .github/workflows/deprovision.yml (workflow_dispatch con confirm=urban-alert-multimedia y main; rutas → servicio (zip vacío) → base con allow_destroy + suffix=run_id y destroy; nunca almacen; resumen).
+T016: actualizar README.md (sección de AWS: arquitectura, orden, workflows, rutas, configuración en la nube, costes, restauración, 403 vs 404; lo local como no mantenido) y crear infra/INVENTARIO.md.
 
 ## Contexto de trabajo
 

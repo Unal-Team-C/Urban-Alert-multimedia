@@ -108,3 +108,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T014 hecha
 - .github/workflows/provision.yml: push a main; job test (pytest tests/unit con Python 3.13, fmt/validate/test de los 4 stacks con -lockfile=readonly, actionlint, shellcheck) → package (build-lambda-zip.sh, artefacto lambda-package) → provision (OIDC; check-platform → almacen → base → servicio con paquete_zip/commit → run-init → rutas → smoke → resumen con planes, rutas, URL de imágenes y paquete). Cada stack hace plan -out y apply del plan, y anota su línea 'Plan:' en el resumen. Concurrencia urban-alert-multimedia-aws sin cancelación.
 - Verificado: actionlint 1.7.7 sin avisos; pasos en el orden de plan §4.3.
+
+## 2026-10-11 · 002-despliegue-aws · T015 hecha
+- .github/workflows/deprovision.yml: workflow_dispatch con confirm = urban-alert-multimedia y solo en main; rutas destroy → servicio destroy (zip vacío de marcador) → base apply allow_destroy + final_snapshot_suffix=run_id → base destroy; stacks vacíos se informan y se saltan; resumen con el estado de cada stack, la copia final y que S3/CloudFront se conservan. Misma concurrencia que Provision.
+- Verificado: actionlint sin avisos; 'almacen' solo aparece en el resumen (el workflow nunca ejecuta ese stack).

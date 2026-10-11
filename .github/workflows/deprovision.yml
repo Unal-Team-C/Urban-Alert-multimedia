@@ -1,0 +1,143 @@
+# Deprovisioning (spec 002, HU-2, RF-011): manual only, with explicit confirmation.
+# Removes the service in reverse order (rutas, servicio, base; plan §4.4) after a final DocumentDB snapshot.
+# Never touches the image storage (S3 + CloudFront stay, so issued imageUrl values keep working; RF-017), the shared
+# platform or the bootstrap resources (OIDC, workflow role, state bucket).
+name: Deprovision
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Escribe urban-alert-multimedia para confirmar que quieres eliminar el servicio (las imágenes se conservan)"
+        required: true
+        type: string
+
+concurrency:
+  group: urban-alert-multimedia-aws
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TF_VERSION: 1.16.5
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  deprovision:
+    name: Deprovision the service
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC: temporary AWS credentials, no stored keys (RF-013)
+    env:
+      SNAPSHOT_SUFFIX: ${{ github.run_id }}
+    steps:
+      - name: Check confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$CONFIRM" != "urban-alert-multimedia" ]; then
+            echo "::error::Confirmation missing: type urban-alert-multimedia. Nothing was deleted."
+            exit 1
+          fi
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow on main (the AWS role only trusts main). Nothing was deleted."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Destroy routes in the shared API Gateway
+        id: rutas
+        run: |
+          terraform -chdir=infra/rutas init -input=false
+          if [ -z "$(terraform -chdir=infra/rutas state list)" ]; then
+            echo "Routes stack is already empty."
+            echo "result=vacío" >> "$GITHUB_OUTPUT"
+          else
+            terraform -chdir=infra/rutas destroy -input=false -auto-approve
+            echo "result=eliminado" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Destroy the Lambda functions
+        id: servicio
+        run: |
+          terraform -chdir=infra/servicio init -input=false
+          if [ -z "$(terraform -chdir=infra/servicio state list)" ]; then
+            echo "Functions stack is already empty."
+            echo "result=vacío" >> "$GITHUB_OUTPUT"
+          else
+            # Destroying does not upload code, but the variables must still be set: an empty placeholder package.
+            : > "$RUNNER_TEMP/empty.zip"
+            terraform -chdir=infra/servicio destroy -input=false -auto-approve \
+              -var "paquete_zip=$RUNNER_TEMP/empty.zip" -var "commit=deprovision"
+            echo "result=eliminado" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lift the DocumentDB protection and set the final snapshot name
+        id: unprotect
+        run: |
+          terraform -chdir=infra/base init -input=false
+          if [ -z "$(terraform -chdir=infra/base state list)" ]; then
+            echo "Base stack is already empty: nothing to delete."
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+          else
+            terraform -chdir=infra/base apply -input=false -auto-approve \
+              -var allow_destroy=true -var "final_snapshot_suffix=$SNAPSHOT_SUFFIX"
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Lambda releases the VPC network interfaces of the deleted functions asynchronously: deleting the function
+      # security group can take 20-40 minutes, and the provider waits for it.
+      - name: Destroy base (a final snapshot of DocumentDB is kept)
+        id: base
+        if: steps.unprotect.outputs.empty == 'false'
+        run: |
+          terraform -chdir=infra/base destroy -input=false -auto-approve \
+            -var allow_destroy=true -var "final_snapshot_suffix=$SNAPSHOT_SUFFIX"
+
+      - name: Summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RUTAS: ${{ steps.rutas.outputs.result }}
+          SERVICIO: ${{ steps.servicio.outputs.result }}
+          BASE_EMPTY: ${{ steps.unprotect.outputs.empty }}
+          BASE_OUTCOME: ${{ steps.base.outcome }}
+        run: |
+          {
+            echo "### Desaprovisionamiento de Multimedia"
+            echo "- Rutas del gateway: ${RUTAS:-no completado}"
+            echo "- Funciones Lambda: ${SERVICIO:-no completado}"
+            if [ "$BASE_EMPTY" = "true" ]; then
+              echo "- Base (DocumentDB, secreto, red, roles): vacío"
+            elif [ "$BASE_OUTCOME" = "success" ]; then
+              echo "- Base (DocumentDB, secreto, red, roles): eliminado"
+              echo "- Copia final de DocumentDB: \`urban-alert-multimedia-final-$SNAPSHOT_SUFFIX\` (restauración: README)"
+            else
+              echo "- Base: no completado"
+            fi
+            echo "- Imágenes: el bucket S3 y CloudFront (stack almacen) **se conservan**; las imageUrl siguen funcionando."
+            echo
+            if [ "$JOB_STATUS" = "success" ]; then
+              echo "Para recrear el servicio: un push a \`main\` (workflow Provision)."
+            else
+              echo "No se completó: revisa el paso que falló; volver a lanzarlo retoma desde el estado."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
