@@ -1,0 +1,8 @@
+{
+  "enforceCheckpointOnStop": true,
+  "requireApprovalGates": true,
+  "autoCommitPerTask": true,
+  "journalTailLines": 20,
+  "maxEditsShown": 25,
+  "gitStatusLines": 25
+}
