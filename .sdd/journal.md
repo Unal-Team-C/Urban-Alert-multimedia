@@ -138,3 +138,8 @@
 ## 2026-10-11 · 002-despliegue-aws · T020 hecha
 - README: imágenes servidas desde S3 (ejemplo de imageUrl, 403 de S3, validación de Reportes con la URL del bucket, diagrama, stacks, orden, configuración, costes con salida de datos de S3) y nota sobre por qué no hay CloudFront. INVENTARIO: almacen sin OAC ni distribución; política con el bloque de CloudFront sin uso. bootstrap/README: bloque CloudFrontImages sin uso y qué hacer si Block Public Access de cuenta rechaza la política pública. notes.md: comprobaciones de verify sin CloudFront.
 - Verificado: CloudFront solo aparece en la nota histórica del README y en el bloque sin uso.
+
+## 2026-10-11 · 002-despliegue-aws · Primer Provision en verde (run 38117564842)
+- 10 min 22 s el job de despliegue. Planes: almacen 1 add / 1 change / 1 destroy (política pública, BPA, borrado de la OAC), base 18 add, servicio 2 add, rutas 4 add.
+- Init: {"indexes": ["objectKey_unique"]} (red, secreto y TLS hacia DocumentDB funcionan). Humo: metadatos de UUID desconocido → 404 "Image not found" (tras un intento con el 404 propio del gateway mientras se desplegaban las rutas), /docs → 404, listado del bucket → 403, clave desconocida → 403.
+- El sha256 del paquete en CI (6947114…) difiere del local (ad71e94…): distinto entorno de pip/zip; el determinismo se exige dentro del mismo entorno (el de CI), se comprobará con el relanzamiento en verify.
