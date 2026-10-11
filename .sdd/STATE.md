@@ -8,11 +8,11 @@
 feature_activa: 002-despliegue-aws
 fase: implement
 tarea_actual: T017
-estado_tarea: -
+estado_tarea: hecha
 
 ## Siguiente paso
 
-T017: validación completa local (PYTEST, TF de los 4 stacks, fmt, LINT, doble build del .zip) y lista de comprobaciones en AWS en notes.md para /sdd-verify.
+Todas las tareas hechas. Siguiente: aplicar la política de bootstrap, hacer push a main (lo decide el usuario) y /sdd-verify con la lista de notes.md.
 
 ## Contexto de trabajo
 

@@ -117,3 +117,7 @@
 - README.md reescrito para AWS: cómo funciona (S3/CloudFront/DocumentDB/gateway), contrato con <gateway> y ejemplo curl, 403 de CloudFront para URL inexistente, despliegue (arquitectura, stacks, workflows, orden de levantamiento con motivos, primera vez, secretos/variables de GitHub con ejemplo, configuración de la función, presupuesto de conexiones, costes, restauración manual de la copia de DocumentDB, validación local con Podman), estructura y entorno local marcado como no mantenido.
 - infra/INVENTARIO.md: recursos por stack, recursos de arranque (incluida la política nueva) y plataforma.
 - Verificado: cubre cada punto de RF-015; grep de password/secret_string sin coincidencias.
+
+## 2026-10-11 · 002-despliegue-aws · T017 hecha
+- Validación local completa en verde: 57 unitarias; Terraform almacen 5/5, base 10/10, servicio 6/6, rutas 3/3 con -lockfile=readonly; fmt; actionlint; shellcheck; doble build del .zip idéntico (21,3 MB).
+- notes.md: resultados y lista de 10 comprobaciones en AWS (HU-1…HU-4, ciclo Deprovision → Provision) para /sdd-verify. RNF-004/RNF-005 solo se pueden medir en AWS.

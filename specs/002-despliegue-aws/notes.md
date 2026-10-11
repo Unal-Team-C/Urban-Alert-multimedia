@@ -12,3 +12,28 @@ Tecnologías impuestas por el usuario: Terraform, GitHub Actions, S3, DocumentDB
 - Permisos que faltan en el rol compartido (políticas actuales: `github-actions-urban-alertPolicy`, `-terraform`, `-platform`): `lambda:*` sobre `function:urban-alert-*`, `cloudfront:*` (distribución + OAC), `iam:PassRole` a `lambda.amazonaws.com`, logs `/aws/lambda/urban-alert-*`, `iam:AttachRolePolicy` (o usar política en línea para ENI de VPC). S3 `urban-alert-*`, `rds:*`, secretos `urban-alert-*`, ECR `urban-alert-*`, SG ya están cubiertos.
 - Concurrencia reservada: la cuenta puede tener límite 10 (no se puede reservar). Variable con defecto sin reserva; documentar el presupuesto de conexiones.
 - Validación local con Podman, igual que la plataforma (fmt, validate, test con mock_provider, actionlint, shellcheck).
+
+## Validación local (T017, 2026-10-11)
+
+| Comprobación | Resultado |
+|---|---|
+| `pytest tests/unit` (python:3.13) | 57 pasan |
+| `terraform init -lockfile=readonly` + `validate` + `test` | almacen 5/5, base 10/10, servicio 6/6, rutas 3/3 |
+| `terraform fmt -check -recursive infra` | ok |
+| actionlint 1.7.7, shellcheck v0.10.0 | sin avisos |
+| `scripts/build-lambda-zip.sh` dos veces | idéntico (sha256 `ad71e946…`), 21,3 MB; importa en python:3.13 amd64 |
+
+## Comprobaciones en AWS para /sdd-verify
+
+Requisito previo: política `github-actions-urban-alert-multimedia` adjunta al rol (infra/bootstrap/README.md) y plataforma aprovisionada.
+
+1. **HU-1 #1, RF-010, MS-001**: integrar en `main` → Provision en verde. Los pasos van en el orden de plan §4.3; el resumen muestra la URL del gateway, la URL de CloudFront y el commit. Anotar la duración del primer Provision (< 30 min).
+2. **HU-3 #1–#3, RNF-004**: `curl -F image=@foto-3.5MB.jpg <gateway>/api/v1/multimedia/images` → `201` en < 15 s (también en frío). El `imageUrl` se abre en un navegador por HTTPS. `exiftool` sobre la descarga: sin GPS ni EXIF salvo la orientación.
+3. **HU-3 #2, #4, #5**: `GET …/images/{imageId}/metadata` → `200`; con un UUID inexistente → `404`; HEIC → `415`; > 3 670 016 bytes → `413`; `lat` sin `lon` → `400`; `GET …/docs` → `404`.
+4. **HU-4 #1, RNF-001**: `https://<bucket>.s3.us-east-2.amazonaws.com/<key>` → `403`; `<cdn>/` → `403`; `aws s3 ls s3://<bucket>` sin permisos → denegado.
+5. **HU-4 #2–#3**: en la consola o con la CLI, DocumentDB sin acceso público, SG de entrada solo desde `urban-alert-multimedia-lambda`, parámetro `tls=enabled`. Variables de la Lambda sin `MONGODB_URI` ni la contraseña.
+6. **HU-1 #3, RNF-003, RNF-005**: relanzar Provision sobre el mismo commit (Re-run all jobs) → los cuatro stacks dicen `No changes` y el job termina en < 15 min.
+7. **HU-1 #4, RF-014**: lanzar Deprovision mientras corre Provision → queda en cola.
+8. **HU-2 #2**: Deprovision con una confirmación incorrecta → falla sin borrar nada.
+9. **HU-2 #1, #3, #7, #8, RF-011, RF-017, MS-002**: subir una imagen y guardar su `imageUrl` → Deprovision → resumen con la copia `urban-alert-multimedia-final-<run_id>` → el `imageUrl` sigue abriendo → `GET …/metadata` → `404` del gateway (ruta eliminada). Sin funciones, clúster ni secreto de Multimedia en la cuenta.
+10. **HU-2 #4, #5**: Deprovision otra vez → "vacío" en los tres stacks, sin error. Push a `main` → el servicio vuelve; el `imageUrl` antiguo sigue funcionando (sus metadatos, solo tras restaurar la copia: README).
