@@ -88,3 +88,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T009 hecha
 - infra/base: SSM de la plataforma, SG -lambda (salida 443 a todo, 27017 al SG -docdb) y -docdb (entrada 27017 solo desde -lambda), subnet group, grupo de parámetros docdb5.0 con tls=enabled, clúster 5.0.0 cifrado (7 días, deletion_protection = !allow_destroy, copia final -final-<suffix>, apply_immediately) + 1 instancia db.t4g.medium, random_password, secreto -docdb con la URI (tls, tlsCAFile=/var/task/certs/global-bundle.pem, replicaSet=rs0, retryWrites=false; recovery 0). La URI deriva de random_password (sensible): no sale en planes ni salidas.
 - Verificado: validate, fmt, 8/8 runs.
+
+## 2026-10-11 · 002-despliegue-aws · T010 hecha
+- infra/base/iam.tf: roles urban-alert-multimedia-api/-init (confían solo en lambda.amazonaws.com) con política en línea: ENI de VPC, GetSecretValue del secreto -docdb, logs de su grupo; solo api tiene s3:PutObject/DeleteObject sobre el bucket (leído de almacen con terraform_remote_state). logs.tf: /aws/lambda/<función> con 30 días. Salidas: nombres de funciones y ARN de roles.
+- Verificado: validate, fmt, 10/10 runs (incluye mínimo privilegio y sin comodines).

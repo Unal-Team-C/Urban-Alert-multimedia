@@ -16,6 +16,15 @@ mock_provider "aws" {
 
 mock_provider "random" {}
 
+override_data {
+  target = data.terraform_remote_state.almacen
+  values = {
+    outputs = {
+      bucket_arn = "arn:aws:s3:::urban-alert-multimedia-images-348364742283"
+    }
+  }
+}
+
 # Platform contract (SSM). StringList values are comma-separated.
 override_data {
   target = data.aws_ssm_parameter.vpc_id
@@ -154,6 +163,68 @@ run "allow_destroy_lifts_protection_and_names_the_snapshot" {
   assert {
     condition     = aws_docdb_cluster.this.final_snapshot_identifier == "urban-alert-multimedia-final-123456"
     error_message = "The final snapshot must be named after the workflow run."
+  }
+}
+
+run "the_api_only_writes_its_bucket_and_init_has_no_s3" {
+  command = apply
+
+  assert {
+    condition = one([
+      for st in jsondecode(aws_iam_role_policy.function["api"].policy).Statement : st if st.Sid == "WriteImages"
+      ]) == {
+      Sid      = "WriteImages"
+      Effect   = "Allow"
+      Action   = ["s3:PutObject", "s3:DeleteObject"]
+      Resource = "arn:aws:s3:::urban-alert-multimedia-images-348364742283/*"
+    }
+    error_message = "The API may only put and delete objects of its bucket (RNF-001)."
+  }
+
+  assert {
+    condition = alltrue(flatten([
+      for k, p in aws_iam_role_policy.function : [
+        for st in jsondecode(p.policy).Statement : !anytrue([for a in flatten([st.Action]) : endswith(a, ":*") || a == "*"])
+      ]
+    ]))
+    error_message = "No wildcard actions in the function policies."
+  }
+
+  assert {
+    condition = length(flatten([
+      for st in jsondecode(aws_iam_role_policy.function["init"].policy).Statement : [for a in flatten([st.Action]) : a if startswith(a, "s3:")]
+    ])) == 0
+    error_message = "The init function must not access S3 (plan D-007)."
+  }
+
+  assert {
+    condition = alltrue([
+      for k, p in aws_iam_role_policy.function :
+      one([for st in jsondecode(p.policy).Statement : st.Resource if st.Sid == "ReadDocumentDbUri"]) == "arn:aws:secretsmanager:us-east-2:348364742283:secret:urban-alert-multimedia-docdb-AbCdEf"
+    ])
+    error_message = "Each function may only read the DocumentDB secret."
+  }
+}
+
+run "functions_have_their_own_roles_and_log_groups" {
+  command = apply
+
+  assert {
+    condition = (
+      aws_iam_role.function["api"].name == "urban-alert-multimedia-api" &&
+      aws_iam_role.function["init"].name == "urban-alert-multimedia-init" &&
+      jsondecode(aws_iam_role.function["api"].assume_role_policy).Statement[0].Principal.Service == "lambda.amazonaws.com"
+    )
+    error_message = "Roles keep the urban-alert- prefix (pipeline PassRole) and trust Lambda only."
+  }
+
+  assert {
+    condition = (
+      aws_cloudwatch_log_group.function["api"].name == "/aws/lambda/urban-alert-multimedia" &&
+      aws_cloudwatch_log_group.function["init"].name == "/aws/lambda/urban-alert-multimedia-init" &&
+      alltrue([for g in aws_cloudwatch_log_group.function : g.retention_in_days == 30])
+    )
+    error_message = "Each function has its log group with a 30-day retention (RNF-008)."
   }
 }
 

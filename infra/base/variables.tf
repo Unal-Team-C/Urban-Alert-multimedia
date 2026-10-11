@@ -59,3 +59,8 @@ variable "docdb_ca_file" {
   type        = string
   default     = "/var/task/certs/global-bundle.pem"
 }
+
+variable "log_retention_days" {
+  description = "Retention of the function logs, in days."
+  type        = number
+}

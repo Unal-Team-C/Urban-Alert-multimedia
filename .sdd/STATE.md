@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T010
+tarea_actual: T011
 estado_tarea: -
 
 ## Siguiente paso
 
-T010: completar infra/base con iam.tf (roles -api e -init, políticas en línea) y logs.tf (grupos /aws/lambda de 30 días), leyendo almacen con terraform_remote_state; tests de mínimo privilegio.
+T011: crear infra/servicio (Lambda api e init: python3.13, x86_64, .zip de var.paquete_zip, VPC, variables de §7.2, pool 2, concurrencia -1, etiqueta Commit) y tests/servicio.tftest.hcl con un .zip de prueba.
 
 ## Contexto de trabajo
 

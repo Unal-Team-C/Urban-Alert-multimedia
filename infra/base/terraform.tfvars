@@ -5,3 +5,4 @@ docdb_engine_version        = "5.0.0"
 docdb_instance_class        = "db.t4g.medium"
 docdb_master_user           = "multimedia"
 docdb_backup_retention_days = 7
+log_retention_days          = 30
