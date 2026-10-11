@@ -134,3 +134,7 @@
 - Decisión del usuario tras el bloqueo de CloudFront (cuenta no verificada): imágenes servidas directamente por S3 (plan D-015; spec RF-002, RF-017, RNF-001, HU-4 #1 y §8 actualizados).
 - infra/almacen: sin OAC ni distribución (la OAC creada en el run 38117129527 se borrará en el próximo apply); BPA solo bloquea ACL; política con una sola sentencia Allow (s3:GetObject para * sobre bucket/*) + denegar sin TLS; salida image_base_url = https://<bucket_regional_domain_name>; sin cdn_price_class. servicio usa image_base_url. Smoke: listado anónimo → 403 y clave desconocida → 403. Workflows con la nueva salida.
 - Verificado: almacen 4/4, servicio 6/6, fmt, actionlint, shellcheck.
+
+## 2026-10-11 · 002-despliegue-aws · T020 hecha
+- README: imágenes servidas desde S3 (ejemplo de imageUrl, 403 de S3, validación de Reportes con la URL del bucket, diagrama, stacks, orden, configuración, costes con salida de datos de S3) y nota sobre por qué no hay CloudFront. INVENTARIO: almacen sin OAC ni distribución; política con el bloque de CloudFront sin uso. bootstrap/README: bloque CloudFrontImages sin uso y qué hacer si Block Public Access de cuenta rechaza la política pública. notes.md: comprobaciones de verify sin CloudFront.
+- Verificado: CloudFront solo aparece en la nota histórica del README y en el bloque sin uso.

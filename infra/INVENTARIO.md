@@ -6,7 +6,7 @@ Cuenta `348364742283`, región `us-east-2`. Spec 002 (RF-009, RF-015, RF-017). N
 
 | Stack | Estado | Recursos | Deprovision |
 |---|---|---|---|
-| `almacen` | `multimedia/almacen.tfstate` | Bucket `urban-alert-multimedia-images-348364742283` (Block Public Access, propietario, SSE-S3, ciclo de vida Intelligent-Tiering día 0 y limpieza de multipart a 7 días, política solo para CloudFront + TLS); Origin Access Control `urban-alert-multimedia-images-348364742283`; distribución de CloudFront (`PriceClass_100`) | **Se conserva** (`prevent_destroy`) |
+| `almacen` | `multimedia/almacen.tfstate` | Bucket `urban-alert-multimedia-images-348364742283` (Block Public Access, propietario, SSE-S3, ciclo de vida Intelligent-Tiering día 0 y limpieza de multipart a 7 días, BPA solo para ACL, política de lectura anónima de objetos sueltos + TLS). Sin CloudFront (plan D-015) | **Se conserva** (`prevent_destroy`) |
 | `base` | `multimedia/base.tfstate` | En la VPC compartida: SG `urban-alert-multimedia-lambda` y `urban-alert-multimedia-docdb`, subnet group y grupo de parámetros `urban-alert-multimedia-docdb`, clúster DocumentDB `urban-alert-multimedia-docdb` + instancia `urban-alert-multimedia-docdb-1`; secreto `urban-alert-multimedia-docdb`; roles `urban-alert-multimedia-api` y `urban-alert-multimedia-init` (políticas en línea `*-runtime`); grupos de logs `/aws/lambda/urban-alert-multimedia` y `/aws/lambda/urban-alert-multimedia-init` | Se elimina; queda la copia `urban-alert-multimedia-final-<run_id>` |
 | `servicio` | `multimedia/servicio.tfstate` | Funciones Lambda `urban-alert-multimedia` (API) y `urban-alert-multimedia-init` (y las interfaces de red que Lambda crea en las subredes privadas) | Se elimina |
 | `rutas` | `multimedia/rutas.tfstate` | En el API Gateway compartido: 1 integración `AWS_PROXY` y las rutas `POST /api/v1/multimedia/images` y `GET /api/v1/multimedia/images/{imageId}/metadata`; permiso `AllowSharedGatewayMultimediaRoutes` en la función | Se elimina |
@@ -24,7 +24,7 @@ Terraform los necesita para ejecutarse; los workflows no los tocan. Cómo crearl
 | Política `github-actions-urban-alertPolicy` | `arn:aws:iam::348364742283:policy/github-actions-urban-alertPolicy` | S3, DocumentDB (`rds:*`), secretos, grupos de seguridad |
 | Política `github-actions-urban-alert-terraform` | `arn:aws:iam::348364742283:policy/github-actions-urban-alert-terraform` | Roles `urban-alert-*`, KMS vía RDS y Secrets Manager |
 | Política `github-actions-urban-alert-platform` | `arn:aws:iam::348364742283:policy/github-actions-urban-alert-platform` | API Gateway, SSM `/urban-alert/*` |
-| Política `github-actions-urban-alert-multimedia` | `arn:aws:iam::348364742283:policy/github-actions-urban-alert-multimedia` | **De este repo**: [bootstrap/github-multimedia-policy.json](bootstrap/github-multimedia-policy.json) (Lambda, CloudFront, PassRole a Lambda, logs `/aws/lambda/urban-alert-*`) |
+| Política `github-actions-urban-alert-multimedia` | `arn:aws:iam::348364742283:policy/github-actions-urban-alert-multimedia` | **De este repo**: [bootstrap/github-multimedia-policy.json](bootstrap/github-multimedia-policy.json) (Lambda, PassRole a Lambda, logs `/aws/lambda/urban-alert-*`; el bloque de CloudFront queda sin uso, D-015) |
 | Bucket del estado | `urban-alert-tfstate-348364742283` | Claves `multimedia/{almacen,base,servicio,rutas}.tfstate` |
 
 ## 3. Plataforma compartida (otro repo, no gestionada aquí)

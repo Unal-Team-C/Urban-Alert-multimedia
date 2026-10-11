@@ -3,7 +3,7 @@
 Microservicio de UrbanAlert que guarda las evidencias fotográficas de los reportes y devuelve, por cada imagen, una **URL definitiva** que Reportes guarda tal cual. Es una **función AWS Lambda en Python 3.13 + FastAPI**; [Mangum](https://mangum.fastapiexpert.com/) traduce los eventos de API Gateway a FastAPI.
 
 En AWS:
-- Las imágenes van a **Amazon S3** y se sirven por **CloudFront**.
+- Las imágenes van a **Amazon S3** y se sirven directamente desde el bucket por HTTPS.
 - Los metadatos van a **Amazon DocumentDB** (compatible con MongoDB).
 - El servicio se publica solo a través del **API Gateway compartido** de la [plataforma de UrbanAlert](https://github.com/Unal-Team-C/urban-alert-plataforma).
 
@@ -18,13 +18,13 @@ Toda la infraestructura es Terraform y la gestionan dos workflows de GitHub Acti
 ```
 Subir:  Cliente ──POST imagen (multipart)──▶ API Gateway ──▶ Lambda ──▶ S3 (objeto) + DocumentDB (metadatos)
                 ◀── 201 { imageId, imageUrl, … }
-Ver:    Cliente ──GET imageUrl────────────────▶ CloudFront ──▶ S3 (sin pasar por la función)
+Ver:    Cliente ──GET imageUrl────────────────▶ S3 (directo, sin pasar por la función)
 ```
 
 - **Formatos:** solo **JPEG y PNG**, detectados por el contenido del archivo y no por el nombre ni el tipo declarado. HEIC, WebP, PDF y el resto responden `415`. El cliente convierte HEIC a JPEG.
 - **Tamaño:** **3 670 016 bytes (3,5 MB) como máximo**, límite incluido. El cliente comprime antes de enviar: el evento síncrono de Lambda no admite más de 6 MB.
 - **Privacidad:** se quitan del archivo los metadatos incrustados (EXIF con GPS, fecha, modelo del dispositivo y autor; XMP; IPTC; comentarios; imágenes secundarias tras el fin del archivo). Solo se conserva la orientación. Los datos de captura viajan como campos del formulario y se guardan en la base de metadatos.
-- **Lectura:** `imageUrl` no caduca ni lleva firma. El bucket es privado: solo CloudFront lee objetos sueltos por su clave (UUID v4). No se puede listar, ni leer sin pasar por CloudFront, ni escribir salvo la función.
+- **Lectura:** `imageUrl` no caduca ni lleva firma. El bucket solo permite leer objetos sueltos por su clave (UUID v4, imposible de adivinar) y solo por HTTPS. No se puede listar ni escribir salvo la función.
 
 ## Contrato
 
@@ -49,7 +49,7 @@ Respuesta `201` (cabecera `Location: /api/v1/multimedia/images/{imageId}/metadat
 ```json
 {
   "imageId": "7f3c2a9e-1b4d-4c6e-9a8f-2d1e0b5c7a31",
-  "imageUrl": "https://d111111abcdef8.cloudfront.net/7f3c2a9e-1b4d-4c6e-9a8f-2d1e0b5c7a31.jpg",
+  "imageUrl": "https://urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com/7f3c2a9e-1b4d-4c6e-9a8f-2d1e0b5c7a31.jpg",
   "contentType": "image/jpeg",
   "sizeBytes": 2457600,
   "uploadedAt": "2026-10-06T21:15:42Z",
@@ -72,11 +72,11 @@ Respuesta `201` (cabecera `Location: /api/v1/multimedia/images/{imageId}/metadat
 
 ### Ver la imagen — `GET {imageUrl}`
 
-La sirve CloudFront directamente, sin pasar por la función. Una URL inexistente responde **`403`**, no `404`: el bucket no permite listar y S3 no revela si la clave existe.
+La sirve S3 directamente, sin pasar por la función. Una URL inexistente responde **`403`**, no `404`: el bucket no permite listar y S3 no revela si la clave existe.
 
 Cualquier otra ruta bajo `/api/v1/multimedia/` (`/docs`, `/openapi.json`, `DELETE …`) responde `404` desde el gateway.
 
-**Para el servicio de Reportes:** recibe `imageUrl` del cliente y la guarda tal cual (mide menos de 2000 caracteres). Conviene validar que empiece por la URL base de las imágenes (`https://<id>.cloudfront.net/`, en el resumen de Provision), para no aceptar imágenes externas.
+**Para el servicio de Reportes:** recibe `imageUrl` del cliente y la guarda tal cual (mide menos de 2000 caracteres). Conviene validar que empiece por la URL base de las imágenes (`https://urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com/`, también en el resumen de Provision), para no aceptar imágenes externas.
 
 **Para el cliente:** comprimir o redimensionar a 3,5 MB o menos, convertir HEIC a JPEG (Safari lo hace al subir; en Chrome, Edge y Firefox de escritorio hace falta una librería como `heic2any`) y enviar la fecha y las coordenadas de captura como campos, porque al recomprimir se pierde el EXIF.
 
@@ -98,12 +98,12 @@ Cuenta `348364742283`, región `us-east-2`. La plataforma compartida debe estar 
  │                       └─HTTPS─► endpoint de gateway S3 ─► bucket de imágenes   │
  │  Lambda urban-alert-multimedia-init (índices; la invoca Provision)            │
  └────────────────────────────────────────────────────────────────────────────────┘
- Cliente ──HTTPS GET imageUrl──► CloudFront (OAC) ──► bucket privado (Intelligent-Tiering)
+ Cliente ──HTTPS GET imageUrl──► bucket S3 (lectura de objetos sueltos, Intelligent-Tiering)
 ```
 
 | Stack (`infra/`) | Recursos | Estado de Terraform | ¿Lo borra Deprovision? |
 |---|---|---|---|
-| [`almacen`](infra/almacen/) | Bucket S3 privado con Intelligent-Tiering desde el día 0, CloudFront con Origin Access Control | `multimedia/almacen.tfstate` | **Nunca** (`prevent_destroy`): las `imageUrl` siguen funcionando |
+| [`almacen`](infra/almacen/) | Bucket S3 con Intelligent-Tiering desde el día 0; lectura anónima de objetos sueltos por HTTPS, sin listado ni escritura | `multimedia/almacen.tfstate` | **Nunca** (`prevent_destroy`): las `imageUrl` siguen funcionando |
 | [`base`](infra/base/) | DocumentDB 5.0 (1 × db.t4g.medium, cifrado, TLS obligatorio, 7 días de copias, protección contra borrado), secreto con la URI, grupos de seguridad, roles de las funciones, logs (30 días) | `multimedia/base.tfstate` | Sí, con copia final de la base |
 | [`servicio`](infra/servicio/) | Lambda del API y Lambda de init (mismo .zip) en las subredes privadas | `multimedia/servicio.tfstate` | Sí |
 | [`rutas`](infra/rutas/) | Integración y las dos rutas en el API Gateway compartido, permiso de invocación | `multimedia/rutas.tfstate` | Sí, la primera |
@@ -126,17 +126,19 @@ Los dos comparten el grupo de concurrencia `urban-alert-multimedia-aws`: nunca s
 | 0 | Pruebas unitarias, `terraform fmt`/`validate`/`test` de los 4 stacks, actionlint, shellcheck | Si algo falla, no se toca AWS |
 | 1 | Paquete .zip ([scripts/build-lambda-zip.sh](scripts/build-lambda-zip.sh)) | Determinista: el mismo código da el mismo hash, y relanzar un commit no cambia la función |
 | 2 | Plataforma ([scripts/check-platform.sh](scripts/check-platform.sh)) | Sin la red y el gateway compartidos no se cambia nada |
-| 3 | `almacen` | Su URL de CloudFront y su bucket los necesitan la función y sus permisos |
+| 3 | `almacen` | La URL del bucket y el bucket los necesitan la función y sus permisos |
 | 4 | `base` | La función necesita el rol, la red y el secreto. La primera vez, DocumentDB tarda 10–15 min |
 | 5 | `servicio` | Las funciones con el .zip del commit (etiqueta `Commit`) |
 | 6 | Init ([scripts/run-init.sh](scripts/run-init.sh)) | Crea los índices dentro de la VPC y prueba red, secreto y TLS antes de abrir el tráfico |
 | 7 | `rutas` | El servicio se publica solo cuando ya está listo |
-| 8 | Prueba de humo ([scripts/smoke-gateway-multimedia.sh](scripts/smoke-gateway-multimedia.sh)) | Metadatos de un id inexistente → `404` del servicio; `/docs` → `404`; CloudFront sin clave y S3 directo → `403`. No escribe datos |
+| 8 | Prueba de humo ([scripts/smoke-gateway-multimedia.sh](scripts/smoke-gateway-multimedia.sh)) | Metadatos de un id inexistente → `404` del servicio; `/docs` → `404`; listado del bucket y clave desconocida → `403`. No escribe datos |
 | 9 | Resumen | URL del gateway, URL base de las imágenes, commit, paquete y plan de cada stack |
+
+**Sin CloudFront (plan D-015):** el diseño original servía las imágenes por CloudFront, pero AWS no deja crear distribuciones en esta cuenta hasta que AWS Support la verifique. Por eso las imágenes se leen directamente del bucket. Añadir CloudFront más adelante cambiaría la URL base y dejaría de funcionar cada `imageUrl` ya guardada.
 
 ### Primera vez
 
-1. Aplicar a mano la política [infra/bootstrap/github-multimedia-policy.json](infra/bootstrap/github-multimedia-policy.json) al rol de los workflows (pasos en [infra/bootstrap/README.md](infra/bootstrap/README.md)). Sin ella, Provision falla con `AccessDenied` sobre Lambda o CloudFront.
+1. Aplicar a mano la política [infra/bootstrap/github-multimedia-policy.json](infra/bootstrap/github-multimedia-policy.json) al rol de los workflows (pasos en [infra/bootstrap/README.md](infra/bootstrap/README.md)). Sin ella, Provision falla con `AccessDenied` sobre Lambda.
 2. Comprobar que la plataforma está aprovisionada.
 3. Integrar en `main`.
 
@@ -158,7 +160,7 @@ La ponen los stacks; no se edita a mano. Los valores ajustables (memoria, tiempo
 | `AWS_ENDPOINT_URL_S3` | **No se define**: boto3 usa S3 nativo |
 | `AWS_REGION`, credenciales | Las pone Lambda (rol `urban-alert-multimedia-api`) |
 | `S3_BUCKET` | `urban-alert-multimedia-images-348364742283` |
-| `PUBLIC_IMAGE_BASE_URL` | `https://<id>.cloudfront.net` (prefijo de `imageUrl`) |
+| `PUBLIC_IMAGE_BASE_URL` | `https://urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com` (prefijo de `imageUrl`) |
 | `MONGODB_URI_SECRET_ARN` | ARN del secreto `urban-alert-multimedia-docdb`, que contiene la URI (TLS con la CA incluida en el paquete, `replicaSet=rs0`, `retryWrites=false`) |
 | `MONGODB_URI` | **No se define** (la URI está en el secreto) |
 | `MONGODB_DATABASE` / `MONGODB_MAX_POOL_SIZE` | `multimedia` / `2` |
@@ -180,7 +182,7 @@ Estimación mensual en `us-east-2` (730 h):
 | Secrets Manager (1 secreto) | 0,40 USD/mes | 0,40 USD | 0 |
 | Lambda (2 funciones) | 0,20 USD/millón de peticiones + GB-s (capa gratuita) | ~0 | 0 |
 | S3 Intelligent-Tiering | 0,023 → 0,0125 (30 días sin acceso) → 0,004 USD/GB-mes (90 días) + 0,0025 USD/1000 objetos | céntimos | céntimos |
-| CloudFront | Capa gratuita: 1 TB y 10 M de peticiones/mes | ~0 | ~0 |
+| Salida de datos de S3 a internet (ver imágenes) | 100 GB/mes gratis; después 0,09 USD/GB | ~0 | ~0 |
 | CloudWatch Logs (30 días) | 0,50 USD/GB ingerido | ~0 | 0 |
 | **Total** | | **~56 USD** | **céntimos** |
 

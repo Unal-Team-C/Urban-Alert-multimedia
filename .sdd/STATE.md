@@ -8,11 +8,11 @@
 feature_activa: 002-despliegue-aws
 fase: verify
 tarea_actual: T020
-estado_tarea: -
+estado_tarea: hecha
 
 ## Siguiente paso
 
-T020: actualizar README.md, infra/INVENTARIO.md e infra/bootstrap/README.md sin CloudFront.
+Push de T019–T020 y vigilar el Provision; si pasa, /sdd-verify con notes.md.
 
 ## Contexto de trabajo
 

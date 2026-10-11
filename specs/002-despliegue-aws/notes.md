@@ -27,10 +27,10 @@ Tecnologías impuestas por el usuario: Terraform, GitHub Actions, S3, DocumentDB
 
 Requisito previo: política `github-actions-urban-alert-multimedia` adjunta al rol (infra/bootstrap/README.md) y plataforma aprovisionada.
 
-1. **HU-1 #1, RF-010, MS-001**: integrar en `main` → Provision en verde. Los pasos van en el orden de plan §4.3; el resumen muestra la URL del gateway, la URL de CloudFront y el commit. Anotar la duración del primer Provision (< 30 min).
+1. **HU-1 #1, RF-010, MS-001**: integrar en `main` → Provision en verde. Los pasos van en el orden de plan §4.3; el resumen muestra la URL del gateway, la URL del bucket de imágenes y el commit. Anotar la duración del primer Provision (< 30 min).
 2. **HU-3 #1–#3, RNF-004**: `curl -F image=@foto-3.5MB.jpg <gateway>/api/v1/multimedia/images` → `201` en < 15 s (también en frío). El `imageUrl` se abre en un navegador por HTTPS. `exiftool` sobre la descarga: sin GPS ni EXIF salvo la orientación.
 3. **HU-3 #2, #4, #5**: `GET …/images/{imageId}/metadata` → `200`; con un UUID inexistente → `404`; HEIC → `415`; > 3 670 016 bytes → `413`; `lat` sin `lon` → `400`; `GET …/docs` → `404`.
-4. **HU-4 #1, RNF-001**: `https://<bucket>.s3.us-east-2.amazonaws.com/<key>` → `403`; `<cdn>/` → `403`; `aws s3 ls s3://<bucket>` sin permisos → denegado.
+4. **HU-4 #1, RNF-001** (D-015): `https://<bucket>.s3.us-east-2.amazonaws.com/` (listado) → `403`; una clave inexistente → `403`; `http://` → denegado; `curl -X PUT` anónimo → `403`.
 5. **HU-4 #2–#3**: en la consola o con la CLI, DocumentDB sin acceso público, SG de entrada solo desde `urban-alert-multimedia-lambda`, parámetro `tls=enabled`. Variables de la Lambda sin `MONGODB_URI` ni la contraseña.
 6. **HU-1 #3, RNF-003, RNF-005**: relanzar Provision sobre el mismo commit (Re-run all jobs) → los cuatro stacks dicen `No changes` y el job termina en < 15 min.
 7. **HU-1 #4, RF-014**: lanzar Deprovision mientras corre Provision → queda en cola.
