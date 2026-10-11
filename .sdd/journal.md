@@ -92,3 +92,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T010 hecha
 - infra/base/iam.tf: roles urban-alert-multimedia-api/-init (confían solo en lambda.amazonaws.com) con política en línea: ENI de VPC, GetSecretValue del secreto -docdb, logs de su grupo; solo api tiene s3:PutObject/DeleteObject sobre el bucket (leído de almacen con terraform_remote_state). logs.tf: /aws/lambda/<función> con 30 días. Salidas: nombres de funciones y ARN de roles.
 - Verificado: validate, fmt, 10/10 runs (incluye mínimo privilegio y sin comodines).
+
+## 2026-10-11 · 002-despliegue-aws · T011 hecha
+- infra/servicio: Lambda api (app.main.handler) e init (app.admin.init_resources.handler) con el mismo .zip (var.paquete_zip + filebase64sha256), python3.13 x86_64, 512 MB, 15 s / 60 s, VPC de base, etiqueta Commit, concurrencia -1. Variables del API: S3_BUCKET, PUBLIC_IMAGE_BASE_URL (CloudFront), MONGODB_URI_SECRET_ARN, MONGODB_DATABASE, MONGODB_MAX_POOL_SIZE=2, ENABLE_DOCS=false, LOG_LEVEL; sin AWS_ENDPOINT_URL_S3 ni MONGODB_URI. Init solo DocumentDB. Validación timeout_s ≤ 29 (gateway 30 s). tests/fixture.zip para el hash.
+- Verificado: validate, fmt, 6/6 runs.

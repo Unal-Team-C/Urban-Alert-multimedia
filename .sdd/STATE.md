@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T011
+tarea_actual: T012
 estado_tarea: -
 
 ## Siguiente paso
 
-T011: crear infra/servicio (Lambda api e init: python3.13, x86_64, .zip de var.paquete_zip, VPC, variables de §7.2, pool 2, concurrencia -1, etiqueta Commit) y tests/servicio.tftest.hcl con un .zip de prueba.
+T012: crear infra/rutas (integración AWS_PROXY 2.0 hacia la función api, 2 rutas NONE, aws_lambda_permission con source_arn /*/*/api/v1/multimedia/*, salida gateway_url de SSM) y tests/rutas.tftest.hcl.
 
 ## Contexto de trabajo
 
