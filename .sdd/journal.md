@@ -62,3 +62,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T003 hecha
 - tests/unit/test_metadata_uri.py (4 pruebas: sin ARN, con ARN y caché, error no cacheado → MetadataStoreError, MetadataStore perezoso) y 2 asserts nuevos en test_config_logging.py.
 - Verificado: fallan solo las nuevas (ImportError de resolve_uri; AttributeError de mongodb_uri_secret_arn); 50 existentes en verde.
+
+## 2026-10-11 · 002-despliegue-aws · T004 hecha
+- tests/unit/test_init_handler.py: el handler crea objectKey_unique sobre una colección falsa y no llama a client_for (S3).
+- Verificado: falla con AttributeError (handler no existe).

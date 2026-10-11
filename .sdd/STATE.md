@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T004
+tarea_actual: T005
 estado_tarea: -
 
 ## Siguiente paso
 
-T004: escribir tests/unit/test_init_handler.py (handler crea objectKey_unique en colección falsa, no usa S3).
+T005: añadir mongodb_uri_secret_arn a Settings; resolve_uri (lru_cache sobre Settings congelado, secrets_client cacheado, error → MetadataStoreError) y MetadataStore perezoso en app/storage/metadata.py.
 
 ## Contexto de trabajo
 
