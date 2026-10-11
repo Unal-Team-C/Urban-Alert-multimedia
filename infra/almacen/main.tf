@@ -1,14 +1,13 @@
-# Persistent image storage (spec 002 RF-002, RF-008, RF-017; plan D-003, D-004, D-005).
+# Persistent image storage (spec 002 RF-002, RF-008, RF-017; plan D-003, D-005, D-015).
 # The Deprovision workflow never touches this stack and prevent_destroy makes any plan that would delete the
-# bucket or the distribution fail: issued imageUrl values keep working across deprovision/provision cycles.
+# bucket fail: issued imageUrl values keep working across deprovision/provision cycles.
+# Images are served directly by S3 (anonymous read of single objects, like MinIO locally): CloudFront needs an
+# account verified by AWS Support, which this account is not (plan D-015).
 data "aws_caller_identity" "current" {}
 
 locals {
   # Bucket names are global: the account id keeps it unique.
   bucket_name = "${var.name}-images-${data.aws_caller_identity.current.account_id}"
-  origin_id   = "s3-images"
-  # AWS managed cache policy "CachingOptimized".
-  caching_optimized_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
 }
 
 resource "aws_s3_bucket" "images" {
@@ -27,13 +26,14 @@ resource "aws_s3_bucket_ownership_controls" "images" {
   }
 }
 
+# ACLs stay blocked; the public read comes only from the bucket policy below (plan D-015).
 resource "aws_s3_bucket_public_access_block" "images" {
   bucket = aws_s3_bucket.images.id
 
   block_public_acls       = true
   ignore_public_acls      = true
-  block_public_policy     = true
-  restrict_public_buckets = true
+  block_public_policy     = false
+  restrict_public_buckets = false
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "images" {
@@ -80,54 +80,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "images" {
   }
 }
 
-resource "aws_cloudfront_origin_access_control" "images" {
-  name                              = local.bucket_name
-  description                       = "CloudFront reads the private images bucket of ${var.name}"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
-}
-
-resource "aws_cloudfront_distribution" "images" {
-  enabled         = true
-  comment         = "Images of ${var.name} (imageUrl base)"
-  price_class     = var.cdn_price_class
-  http_version    = "http2and3"
-  is_ipv6_enabled = true
-
-  origin {
-    origin_id                = local.origin_id
-    domain_name              = aws_s3_bucket.images.bucket_regional_domain_name
-    origin_access_control_id = aws_cloudfront_origin_access_control.images.id
-  }
-
-  default_cache_behavior {
-    target_origin_id       = local.origin_id
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = local.caching_optimized_policy_id
-    # JPEG and PNG are already compressed.
-    compress = false
-  }
-
-  restrictions {
-    geo_restriction {
-      restriction_type = "none"
-    }
-  }
-
-  viewer_certificate {
-    cloudfront_default_certificate = true
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-# Only this distribution reads objects (no ListBucket: an unknown key answers 403); nothing works without TLS.
-# The function writes through its IAM role (stack base), not through this policy.
+# Anyone may read a single object by its key (UUID v4, unguessable), over TLS only. No ListBucket: an unknown key
+# answers 403. Nobody writes anonymously; the function writes through its IAM role (stack base).
 resource "aws_s3_bucket_policy" "images" {
   bucket = aws_s3_bucket.images.id
 
@@ -135,12 +89,11 @@ resource "aws_s3_bucket_policy" "images" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "CloudFrontReadsObjects"
+        Sid       = "PublicReadSingleObjects"
         Effect    = "Allow"
-        Principal = { Service = "cloudfront.amazonaws.com" }
+        Principal = "*"
         Action    = "s3:GetObject"
         Resource  = "${aws_s3_bucket.images.arn}/*"
-        Condition = { StringEquals = { "AWS:SourceArn" = aws_cloudfront_distribution.images.arn } }
       },
       {
         Sid       = "DenyInsecureTransport"
@@ -153,6 +106,6 @@ resource "aws_s3_bucket_policy" "images" {
     ]
   })
 
-  # The public access block must exist first, so the policy is evaluated with it in place.
+  # The public access block must allow public policies before this one is put.
   depends_on = [aws_s3_bucket_public_access_block.images]
 }

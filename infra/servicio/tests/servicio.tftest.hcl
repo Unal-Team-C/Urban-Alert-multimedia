@@ -5,8 +5,8 @@ override_data {
   target = data.terraform_remote_state.almacen
   values = {
     outputs = {
-      bucket_name = "urban-alert-multimedia-images-348364742283"
-      cdn_url     = "https://d111111abcdef8.cloudfront.net"
+      bucket_name    = "urban-alert-multimedia-images-348364742283"
+      image_base_url = "https://urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com"
     }
   }
 }
@@ -70,10 +70,10 @@ run "api_uses_the_cloud_services" {
     condition = (
       aws_lambda_function.api.environment[0].variables["MONGODB_URI_SECRET_ARN"] == "arn:aws:secretsmanager:us-east-2:348364742283:secret:urban-alert-multimedia-docdb-AbCdEf" &&
       aws_lambda_function.api.environment[0].variables["S3_BUCKET"] == "urban-alert-multimedia-images-348364742283" &&
-      aws_lambda_function.api.environment[0].variables["PUBLIC_IMAGE_BASE_URL"] == "https://d111111abcdef8.cloudfront.net" &&
+      aws_lambda_function.api.environment[0].variables["PUBLIC_IMAGE_BASE_URL"] == "https://urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com" &&
       aws_lambda_function.api.environment[0].variables["ENABLE_DOCS"] == "false"
     )
-    error_message = "The API must use its bucket, CloudFront as imageUrl base and the DocumentDB secret (RF-002, RF-004)."
+    error_message = "The API must use its bucket, the bucket URL as imageUrl base and the DocumentDB secret (RF-002, RF-004)."
   }
 }
 

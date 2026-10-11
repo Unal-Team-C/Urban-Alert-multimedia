@@ -67,7 +67,7 @@ Como cliente quiero subir una foto y consultar sus metadatos por el API Gateway,
 Como equipo queremos que imágenes y metadatos vivan en servicios gestionados de AWS, accesibles solo por donde corresponde, para no administrar servidores ni exponer datos.
 
 **Criterios de aceptación**
-1. Dado el entorno aprovisionado, cuando alguien intenta listar el contenido del almacenamiento de imágenes, escribir en él o leer un objeto directamente sin pasar por la CDN, entonces se le deniega.
+1. Dado el entorno aprovisionado, cuando alguien sin credenciales intenta listar el contenido del almacenamiento de imágenes o escribir en él, entonces se le deniega; solo puede leer una imagen concreta por su URL (HTTPS).
 2. Dado el entorno aprovisionado, cuando se intenta conectar a la base de metadatos desde internet o desde otro servicio de la VPC, entonces no es posible; solo la función de Multimedia (y su proceso de inicialización) llegan a ella.
 3. Dado el servicio desplegado, cuando se conecta a la base de metadatos, entonces la conexión va cifrada y la credencial se lee del almacén de secretos en tiempo de ejecución.
 4. Dada una imagen que lleva meses sin leerse (nivel de acceso poco frecuente), cuando se abre su `imageUrl`, entonces se sigue descargando con un GET directo.
@@ -99,17 +99,17 @@ Como revisor o nuevo integrante quiero encontrar en el repositorio cómo se desp
 ## 5. Requisitos funcionales
 
 - **RF-001**: La función de Multimedia DEBE desplegarse en AWS como función sin servidor con el runtime gestionado de Python 3.13, a partir de un paquete de código (.zip) construido en el flujo con las dependencias de `requirements.txt`, con 512 MB de memoria y 15 s de tiempo máximo. No se usa imagen de contenedor ni registro de imágenes _(cambio 2026-10-11)_.
-- **RF-002**: Las imágenes DEBEN guardarse en Amazon S3, en un bucket privado: sin acceso público, sin listado y sin escritura salvo por la función. La lectura pública DEBE hacerse solo por una CDN con HTTPS, y `imageUrl` DEBE empezar por la URL base de esa CDN.
+- **RF-002**: Las imágenes DEBEN guardarse en Amazon S3. El bucket solo admite lectura anónima de objetos sueltos por su clave, por HTTPS; sin listado y sin escritura salvo por la función. `imageUrl` DEBE empezar por la URL HTTPS del bucket (`https://<bucket>.s3.<región>.amazonaws.com`) _(cambio 2026-10-11: CloudFront exige una cuenta verificada por AWS Support; ver §11)_.
 - **RF-003**: Los metadatos DEBEN guardarse en Amazon DocumentDB (compatible con MongoDB), en las subredes privadas de la plataforma, sin acceso público, con conexión cifrada obligatoria y almacenamiento cifrado.
 - **RF-004**: La credencial de la base de metadatos DEBE guardarse en el almacén de secretos de AWS y la función DEBE leerla en tiempo de ejecución; no puede aparecer en el repositorio, en la imagen, en la configuración visible de la función, en las variables de GitHub ni en los logs.
 - **RF-005**: El servicio DEBE registrar en el API Gateway compartido exactamente `POST /api/v1/multimedia/images` y `GET /api/v1/multimedia/images/{imageId}/metadata`, públicas (sin autenticación de clientes, como el resto de la plataforma), sin reescritura de ruta y sin registrar `$default` ni rutas fuera de su prefijo.
 - **RF-006**: La función DEBE ejecutarse en las subredes privadas de la plataforma, tomando VPC, subredes, gateway y demás identificadores del contrato SSM en cada aprovisionamiento, sin copiarlos a mano. NO DEBE tener URL pública propia: solo se invoca a través del API Gateway compartido.
 - **RF-007**: Cada aprovisionamiento DEBE ejecutar el proceso de inicialización de recursos (índices de la base de metadatos) dentro de la red privada, después de crear la base y antes de dar el despliegue por bueno; repetirlo no causa errores ni cambios.
 - **RF-008**: La regla de ciclo de vida del almacenamiento de imágenes (QAS-08) DEBE pasar cada imagen a S3 Intelligent-Tiering desde el primer día, sin activar sus niveles de archivo opcionales (que exigen restauración): toda imagen sigue admitiendo lectura directa por GET, sin cargos por lectura _(clarificación 2026-10-11)_.
-- **RF-009**: Toda la infraestructura del servicio DEBE estar definida como código con Terraform en este repositorio: función, roles y permisos, reglas de red, base de metadatos, secreto, bucket y su política, CDN, rutas en el gateway y logs. El estado DEBE guardarse en `urban-alert-tfstate-348364742283` bajo claves propias (`multimedia/...`), cifrado y con bloqueo.
+- **RF-009**: Toda la infraestructura del servicio DEBE estar definida como código con Terraform en este repositorio: función, roles y permisos, reglas de red, base de metadatos, secreto, bucket y su política, rutas en el gateway y logs. El estado DEBE guardarse en `urban-alert-tfstate-348364742283` bajo claves propias (`multimedia/...`), cifrado y con bloqueo.
 - **RF-010**: El flujo de aprovisionamiento DEBE ejecutarse cuando se integran cambios en `main` y, en este orden: comprobaciones estáticas y pruebas unitarias; comprobación de que la plataforma está aprovisionada; almacenamiento de imágenes; recursos base; construcción del paquete de código; funciones; inicialización (RF-007); rutas; prueba de humo a través del gateway; resumen con la URL del gateway y la URL base de las imágenes. Cualquier paso fallido DEBE detener los siguientes.
 - **RF-011**: El flujo de desaprovisionamiento DEBE ejecutarse solo a mano (bajo demanda desde GitHub), exigir que se escriba `urban-alert-multimedia` para confirmar, ejecutarse solo sobre `main`, y eliminar en orden inverso: rutas del gateway y función, y después los recursos base, dejando antes una copia final de la base de metadatos. No toca la plataforma compartida, los recursos de arranque ni el almacenamiento persistente de imágenes (RF-017).
-- **RF-017**: El bucket de imágenes, con sus imágenes, y la CDN que las sirve DEBEN conservarse al desaprovisionar, fuera del alcance de ese flujo. El siguiente aprovisionamiento DEBE reutilizarlos, de modo que las `imageUrl` emitidas antes sigan funcionando. Ningún flujo puede borrar el bucket ni su contenido _(clarificación 2026-10-11)_.
+- **RF-017**: El bucket de imágenes, con sus imágenes, DEBE conservarse al desaprovisionar, fuera del alcance de ese flujo. El siguiente aprovisionamiento DEBE reutilizarlo, de modo que las `imageUrl` emitidas antes sigan funcionando. Ningún flujo puede borrar el bucket ni su contenido _(clarificación 2026-10-11)_.
 - **RF-012**: La protección contra borrado de la base de metadatos solo la desactiva el flujo de desaprovisionamiento, nunca el de aprovisionamiento.
 - **RF-013**: Los flujos DEBEN autenticarse en AWS con el rol de `AWS_ROLE_ARN` por OIDC (credenciales temporales) en la región de `AWS_REGION`, sin claves de larga duración.
 - **RF-014**: Aprovisionamiento y desaprovisionamiento DEBEN compartir un grupo de concurrencia sin cancelación: nunca se ejecutan a la vez.
@@ -118,7 +118,7 @@ Como revisor o nuevo integrante quiero encontrar en el repositorio cómo se desp
 
 ## 6. Requisitos no funcionales
 
-- **RNF-001 (seguridad)**: Ningún secreto aparece en el repositorio, la imagen, variables de GitHub, salidas de Terraform ni logs de los flujos. El almacenamiento de imágenes y la base de metadatos no tienen acceso público. La función solo tiene los permisos que usa (escribir y borrar objetos de su bucket, leer su secreto, red en la VPC, logs).
+- **RNF-001 (seguridad)**: Ningún secreto aparece en el repositorio, la imagen, variables de GitHub, salidas de Terraform ni logs de los flujos. La base de metadatos no tiene acceso público; el almacenamiento de imágenes solo permite leer anónimamente objetos sueltos (sin listado ni escritura). La función solo tiene los permisos que usa (escribir y borrar objetos de su bucket, leer su secreto, red en la VPC, logs).
 - **RNF-002 (conexiones)**: El número máximo de conexiones simultáneas de la función a la base (instancias concurrentes × pool por instancia) está acotado y documentado, y es inferior al máximo que admite la instancia elegida.
 - **RNF-003 (idempotencia)**: Dos aprovisionamientos seguidos sobre el mismo commit dan cero cambios de infraestructura en el segundo.
 - **RNF-004 (latencia)**: Una subida de una imagen de 3,5 MB a través del gateway responde en menos de 15 s, incluida una invocación en frío.
@@ -131,13 +131,14 @@ Como revisor o nuevo integrante quiero encontrar en el repositorio cómo se desp
 
 No hay entidades de datos nuevas: el documento de metadatos de imagen (colección `images`) y el contrato de la API no cambian. Recursos del entorno relevantes:
 
-- **Entorno de Multimedia en la nube**: funciones, bucket de imágenes, CDN, base de metadatos, secreto, reglas de red, rutas en el gateway y logs.
+- **Entorno de Multimedia en la nube**: funciones, bucket de imágenes, base de metadatos, secreto, reglas de red, rutas en el gateway y logs.
 - **Plataforma compartida** (externa): red privada, salida a internet y API Gateway; esta feature solo la consume.
 - **Recursos de arranque** (externos): proveedor OIDC, rol de los workflows con sus políticas, bucket del estado.
 
 ## 8. Fuera de alcance
 
-- Dominio propio para el gateway o para la CDN (se usan los dominios que asigna AWS).
+- Dominio propio para el gateway o para las imágenes (se usan los dominios que asigna AWS).
+- CDN delante de las imágenes (CloudFront): la cuenta no está verificada para crearla. Añadirla después cambiaría la URL base de `imageUrl`.
 - Autenticación de clientes en el gateway (la plataforma no la tiene, RF-017 de su spec 001).
 - Entornos múltiples (solo uno, el de la cuenta 348364742283).
 - Limpieza diferida de objetos huérfanos (HU-6 de la spec del servicio) y migración de datos desde el entorno local.
@@ -150,24 +151,26 @@ No hay entidades de datos nuevas: el documento de metadatos de imagen (colecció
 
 - "Al aprobar un pull request en main" se interpreta como **al integrarlo** (evento `push` a `main`): el rol de AWS solo confía en la rama `main` (`ref:refs/heads/main`), y desplegar código aprobado pero no integrado dejaría `main` y AWS desalineados. Es el mismo criterio que la plataforma y Geoespacial. Como el repo es privado en un plan sin protección de ramas, un push directo a `main` también dispara el aprovisionamiento.
 - La plataforma compartida está aprovisionada antes del primer aprovisionamiento, y su NAT da a la función salida hacia el almacén de secretos; S3 se alcanza por el endpoint de gateway que ya tiene la plataforma.
-- Una persona con permisos de administración añade a mano al rol compartido los permisos que falten (funciones sin servidor, CDN, paso de rol a la función, logs de la función), siguiendo el JSON versionado en este repo.
-- La URL base de la CDN que asigna AWS se acepta como URL definitiva mientras el entorno exista.
+- Una persona con permisos de administración añade a mano al rol compartido los permisos que falten (funciones sin servidor, paso de rol a la función, logs de la función), siguiendo el JSON versionado en este repo.
+- La URL HTTPS del bucket que asigna AWS se acepta como URL definitiva: no cambia mientras exista el bucket, que no se borra al desaprovisionar.
 - Las rutas de subida y consulta son públicas, igual que en local; el límite de tasa y CORS los pone el gateway compartido.
 - Un despliegue en una sola zona para la base de metadatos (una instancia) es suficiente para un proyecto académico.
 
 ## 10. Métricas de éxito
 
 - **MS-001**: Tras integrar en `main`, en menos de 30 minutos (primer aprovisionamiento, con la creación de la base) una subida por el gateway devuelve `201` y su `imageUrl` se abre en un navegador.
-- **MS-002**: El desaprovisionamiento deja cero recursos del servicio con coste por hora en la cuenta (quedan la copia final de la base, el bucket de imágenes y la CDN, que solo cobran por almacenamiento y uso) y la plataforma puede desaprovisionarse después sin encontrar dependientes de Multimedia.
+- **MS-002**: El desaprovisionamiento deja cero recursos del servicio con coste por hora en la cuenta (quedan la copia final de la base y el bucket de imágenes, que solo cobran por almacenamiento y uso) y la plataforma puede desaprovisionarse después sin encontrar dependientes de Multimedia.
 - **MS-003**: Un integrante sin contexto reproduce el entorno siguiendo solo la documentación.
 
 ## 11. Clarificaciones
 
 ### Sesión 2026-10-11
-- P: Al desaprovisionar, ¿qué pasa con las imágenes? → R: (b) el bucket y sus imágenes se conservan fuera del desaprovisionamiento. Se conserva también la CDN (sin coste por hora) para que las `imageUrl` emitidas no cambien → RF-017, HU-2 #8.
+- P: Al desaprovisionar, ¿qué pasa con las imágenes? → R: (b) el bucket y sus imágenes se conservan fuera del desaprovisionamiento. Se conserva también la CDN (sin coste por hora) para que las `imageUrl` emitidas no cambien → RF-017, HU-2 #8. (La CDN se retiró después, ver más abajo.)
 
 - Cambio del usuario: despliegue como .zip en vez de imagen de contenedor; "el entorno local ya no es necesario" → RF-001 cambiado, RF-016 eliminado, sin registro de imágenes.
 - P: Regla de ciclo de vida QAS-08: ¿tras cuántos días y a qué clase? → R: Intelligent-Tiering desde el primer día, sin niveles de archivo opcionales (sin cargos por lectura ni mínimo de 90 días; baja sola a 0,0125 y 0,004 USD/GB-mes) → RF-008, HU-4 #4.
+
+- Cambio del usuario tras el Provision 38117129527: CloudFront respondió "Your account must be verified before you can add new CloudFront resources". Opción elegida: sin CloudFront, `imageUrl` = URL HTTPS del bucket con lectura anónima de objetos sueltos (como MinIO en local) → RF-002, RF-017, RNF-001, HU-4 #1, §8.
 
 ---
 

@@ -1,6 +1,6 @@
 # Deprovisioning (spec 002, HU-2, RF-011): manual only, with explicit confirmation.
 # Removes the service in reverse order (rutas, servicio, base; plan §4.4) after a final DocumentDB snapshot.
-# Never touches the image storage (S3 + CloudFront stay, so issued imageUrl values keep working; RF-017), the shared
+# Never touches the image storage (the S3 bucket stays, so issued imageUrl values keep working; RF-017), the shared
 # platform or the bootstrap resources (OIDC, workflow role, state bucket).
 name: Deprovision
 
@@ -133,7 +133,7 @@ jobs:
             else
               echo "- Base: no completado"
             fi
-            echo "- Imágenes: el bucket S3 y CloudFront (stack almacen) **se conservan**; las imageUrl siguen funcionando."
+            echo "- Imágenes: el bucket S3 (stack almacen) **se conserva**; las imageUrl siguen funcionando."
             echo
             if [ "$JOB_STATUS" = "success" ]; then
               echo "Para recrear el servicio: un push a \`main\` (workflow Provision)."

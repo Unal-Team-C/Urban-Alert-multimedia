@@ -58,6 +58,8 @@ Atajos de verificación (Podman, desde la raíz del repo; ver plan §2):
 <!-- /sdd-verify añade aquí tareas si detecta fallos -->
 
 - [x] T018 Corregir build-lambda-zip.sh con una ruta de salida relativa (falló el primer Provision, run 38116975110: `zip error: Could not create output file (build/multimedia.zip)`, porque zip se ejecuta dentro de build/pkg) — archivos: scripts/build-lambda-zip.sh — cubre: RF-001, RF-010 — verifica: `scripts/build-lambda-zip.sh build/multimedia.zip` (ruta relativa, como en el workflow) genera el .zip con el mismo sha256; shellcheck sin avisos
+- [x] T019 Servir las imágenes directamente desde S3 sin CloudFront (D-015): almacen sin OAC ni distribución, política de lectura anónima de objetos sueltos solo por TLS, BPA solo para ACL, salida `image_base_url`; servicio usa `image_base_url`; prueba de humo sin CloudFront (listado → 403); workflows con la nueva salida — archivos: infra/almacen/*, infra/servicio/main.tf, infra/servicio/tests/servicio.tftest.hcl, scripts/smoke-gateway-multimedia.sh, .github/workflows/*.yml — cubre: RF-002, RF-017, RNF-001 — verifica: `TF almacen` y `TF servicio` en verde; actionlint y shellcheck sin avisos
+- [ ] T020 Actualizar README e INVENTARIO sin CloudFront (URL de imágenes, costes, 403 de S3, política de bootstrap con bloque sin uso, Block Public Access de cuenta) — archivos: README.md, infra/INVENTARIO.md, infra/bootstrap/README.md — cubre: RF-015 — verifica: `grep -n CloudFront` solo en notas históricas o del bloque sin uso
 
 ## Cobertura
 

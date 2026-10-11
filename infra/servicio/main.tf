@@ -25,10 +25,10 @@ locals {
   base    = data.terraform_remote_state.base.outputs
 
   # Cloud configuration of the service (plan §7.2): no AWS_ENDPOINT_URL_S3 (native S3) and no MONGODB_URI
-  # (read from Secrets Manager); imageUrl values start with the CloudFront URL.
+  # (read from Secrets Manager); imageUrl values start with the HTTPS URL of the bucket (plan D-015).
   api_environment = {
     S3_BUCKET              = local.almacen.bucket_name
-    PUBLIC_IMAGE_BASE_URL  = local.almacen.cdn_url
+    PUBLIC_IMAGE_BASE_URL  = local.almacen.image_base_url
     MONGODB_URI_SECRET_ARN = local.base.docdb_secret_arn
     MONGODB_DATABASE       = "multimedia"
     MONGODB_MAX_POOL_SIZE  = tostring(var.mongodb_max_pool_size)

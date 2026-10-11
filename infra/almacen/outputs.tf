@@ -7,15 +7,7 @@ output "bucket_arn" {
   value = aws_s3_bucket.images.arn
 }
 
-output "cdn_domain" {
-  value = aws_cloudfront_distribution.images.domain_name
-}
-
-output "cdn_url" {
-  description = "Base of every imageUrl (PUBLIC_IMAGE_BASE_URL of the function)."
-  value       = "https://${aws_cloudfront_distribution.images.domain_name}"
-}
-
-output "distribution_id" {
-  value = aws_cloudfront_distribution.images.id
+output "image_base_url" {
+  description = "Base of every imageUrl (PUBLIC_IMAGE_BASE_URL of the function): the HTTPS URL of the bucket."
+  value       = "https://${aws_s3_bucket.images.bucket_regional_domain_name}"
 }

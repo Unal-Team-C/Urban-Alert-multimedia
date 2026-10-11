@@ -3,16 +3,16 @@
 <!-- Puntero de reanudación. Claude lo actualiza en CADA transición (inicio/fin de tarea, cambio de fase, decisión, bloqueo).
      Editar este archivo = checkpoint (lo registra el hook). Mantenlo corto: el detalle va en specs/ y journal.md.
      fase: constitution | specify | clarify | plan | tasks | implement | verify | done
-     estado_tarea: - | en_progreso | hecha | bloqueada -->
+     estado_tarea: en_progreso
 
 feature_activa: 002-despliegue-aws
 fase: verify
-tarea_actual: T018
-estado_tarea: hecha
+tarea_actual: T020
+estado_tarea: -
 
 ## Siguiente paso
 
-Vigilar el Provision relanzado por el push de T018 (corrección de la ruta del .zip); si pasa, /sdd-verify con la lista de notes.md.
+T020: actualizar README.md, infra/INVENTARIO.md e infra/bootstrap/README.md sin CloudFront.
 
 ## Contexto de trabajo
 
@@ -23,4 +23,4 @@ Vigilar el Provision relanzado por el push de T018 (corrección de la ruta del .
 
 ## Bloqueos / preguntas abiertas
 
-- ninguno
+- (resuelto por decisión del usuario: sin CloudFront, D-015) La OAC creada en el run 38117129527 se elimina en el siguiente apply de almacen.

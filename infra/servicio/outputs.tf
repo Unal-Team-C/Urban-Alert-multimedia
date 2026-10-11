@@ -16,5 +16,5 @@ output "init_function_name" {
 }
 
 output "image_base_url" {
-  value = local.almacen.cdn_url
+  value = local.almacen.image_base_url
 }

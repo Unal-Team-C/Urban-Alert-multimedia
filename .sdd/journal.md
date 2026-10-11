@@ -125,3 +125,12 @@
 ## 2026-10-11 · 002-despliegue-aws · T018 hecha (corrección)
 - Primer Provision (run 38116975110) falló en el job package: `zip error: Could not create output file (build/multimedia.zip)`. El script hacía `cd` a build/pkg antes de zip y la ruta de salida era relativa. En local solo se probó la ruta por defecto (absoluta). Nada se creó en AWS.
 - Corrección: la salida se convierte en ruta absoluta antes de construir. Verificado con la ruta relativa del workflow: mismo sha256 (ad71e946…); shellcheck sin avisos.
+
+## 2026-10-11 · 002-despliegue-aws · Bloqueo: CloudFront exige cuenta verificada
+- Provision run 38117129527: tests y paquete en verde; almacen creó bucket (con BPA, cifrado, propiedad, ciclo de vida) y OAC, pero CloudFront respondió 403 AccessDenied: "Your account must be verified before you can add new CloudFront resources. To verify your account, please contact AWS Support". No es IAM: es una restricción de cuentas nuevas. base/servicio/rutas no se ejecutaron.
+- Opciones planteadas al usuario: (A) caso de soporte para verificar la cuenta y relanzar; (B) cambiar RF-002: servir las imágenes directamente desde S3 con lectura pública de objetos sueltos (sin listado), como MinIO en local, sin CloudFront.
+
+## 2026-10-11 · 002-despliegue-aws · T019 hecha
+- Decisión del usuario tras el bloqueo de CloudFront (cuenta no verificada): imágenes servidas directamente por S3 (plan D-015; spec RF-002, RF-017, RNF-001, HU-4 #1 y §8 actualizados).
+- infra/almacen: sin OAC ni distribución (la OAC creada en el run 38117129527 se borrará en el próximo apply); BPA solo bloquea ACL; política con una sola sentencia Allow (s3:GetObject para * sobre bucket/*) + denegar sin TLS; salida image_base_url = https://<bucket_regional_domain_name>; sin cdn_price_class. servicio usa image_base_url. Smoke: listado anónimo → 403 y clave desconocida → 403. Workflows con la nueva salida.
+- Verificado: almacen 4/4, servicio 6/6, fmt, actionlint, shellcheck.

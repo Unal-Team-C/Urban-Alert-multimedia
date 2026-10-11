@@ -123,7 +123,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      - name: Apply almacen (S3 + CloudFront; persistent, never destroyed)
+      - name: Apply almacen (S3 images bucket; persistent, never destroyed)
         id: almacen
         run: |
           terraform -chdir=infra/almacen init -input=false
@@ -131,8 +131,7 @@ jobs:
           echo "almacen: $(grep -E '^(Plan:|No changes)' plan.txt)" >> "$PLANS"
           terraform -chdir=infra/almacen apply -input=false tfplan
           {
-            echo "bucket=$(terraform -chdir=infra/almacen output -raw bucket_name)"
-            echo "cdn_url=$(terraform -chdir=infra/almacen output -raw cdn_url)"
+            echo "image_base_url=$(terraform -chdir=infra/almacen output -raw image_base_url)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Apply base (DocumentDB, secret, security groups, roles, logs)
@@ -166,19 +165,17 @@ jobs:
           terraform -chdir=infra/rutas apply -input=false tfplan
           echo "gateway=$(terraform -chdir=infra/rutas output -raw gateway_url)" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke test through the gateway and CloudFront
+      - name: Smoke test through the gateway and the images bucket
         env:
           GATEWAY: ${{ steps.rutas.outputs.gateway }}
-          CDN_URL: ${{ steps.almacen.outputs.cdn_url }}
-          BUCKET: ${{ steps.almacen.outputs.bucket }}
-          REGION: ${{ vars.AWS_REGION }}
-        run: scripts/smoke-gateway-multimedia.sh "$GATEWAY" "$CDN_URL" "$BUCKET" "$REGION"
+          IMAGES: ${{ steps.almacen.outputs.image_base_url }}
+        run: scripts/smoke-gateway-multimedia.sh "$GATEWAY" "$IMAGES"
 
       - name: Summary
         if: always()
         env:
           GATEWAY: ${{ steps.rutas.outputs.gateway }}
-          CDN_URL: ${{ steps.almacen.outputs.cdn_url }}
+          IMAGES: ${{ steps.almacen.outputs.image_base_url }}
           PACKAGE_LINE: ${{ needs.package.outputs.line }}
         run: |
           {
@@ -191,7 +188,7 @@ jobs:
             else
               echo "- Rutas del gateway: (no disponibles)"
             fi
-            echo "- URL base de las imágenes: ${CDN_URL:-–}"
+            echo "- URL base de las imágenes: ${IMAGES:-–}"
             echo
             echo "Planes:"
             echo '```'

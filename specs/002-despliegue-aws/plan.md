@@ -2,13 +2,13 @@
 
 - **Spec**: ./spec.md
 - **Estado**: aprobado <!-- borrador | aprobado -->
-- **Fecha**: 2026-10-11 (revisión 2: paquete .zip en vez de imagen de contenedor; sin entorno local)
+- **Fecha**: 2026-10-11 (revisión 2: paquete .zip en vez de imagen de contenedor; sin entorno local. Revisión 3: sin CloudFront, D-015)
 
 ## 1. Resumen técnico
 
 Cuatro stacks de Terraform con estado en `s3://urban-alert-tfstate-348364742283/multimedia/`, aplicados solo desde GitHub Actions:
 
-- **`almacen`** (persistente, nunca se destruye): S3 de imágenes con Intelligent-Tiering y CloudFront con OAC.
+- **`almacen`** (persistente, nunca se destruye): S3 de imágenes con Intelligent-Tiering y lectura anónima de objetos sueltos (D-015).
 - **`base`**: DocumentDB, secreto con la URI, grupos de seguridad, roles de las funciones y logs.
 - **`servicio`**: Lambda del API y Lambda de inicialización. Ambas usan el runtime gestionado `python3.13` y el mismo paquete .zip, y van en la VPC de la plataforma.
 - **`rutas`**: integración y dos rutas en el API Gateway compartido, más el permiso de invocación.
@@ -20,7 +20,7 @@ Cambios en el código para usar la nube:
 - La URI de MongoDB se lee de Secrets Manager si existe `MONGODB_URI_SECRET_ARN`.
 - `init_resources` gana un handler de Lambda.
 
-Sin `AWS_ENDPOINT_URL_S3`, boto3 usa S3 nativo; `PUBLIC_IMAGE_BASE_URL` pasa a ser el dominio de CloudFront. Orden de levantamiento en §4.3; el desmontaje es el inverso, sin tocar `almacen`. No hay ECR ni imagen de contenedor.
+Sin `AWS_ENDPOINT_URL_S3`, boto3 usa S3 nativo; `PUBLIC_IMAGE_BASE_URL` pasa a ser la URL HTTPS del bucket. Orden de levantamiento en §4.3; el desmontaje es el inverso, sin tocar `almacen`. No hay ECR ni imagen de contenedor.
 
 ## 2. Contexto técnico
 
@@ -29,7 +29,7 @@ Sin `AWS_ENDPOINT_URL_S3`, boto3 usa S3 nativo; `PUBLIC_IMAGE_BASE_URL` pasa a s
 | Lenguaje / versión | Python 3.13 (runtime gestionado `python3.13` de Lambda, x86_64), FastAPI + Mangum; Terraform `>= 1.10, < 2.0` (CI y local con `hashicorp/terraform:1.16.5`) |
 | Dependencias principales | Las de `requirements.txt` sin cambios (boto3 ya incluye Secrets Manager). Proveedores `hashicorp/aws ~> 6.0` y `hashicorp/random ~> 3.6` |
 | Paquete | `build/multimedia.zip`: medido el 2026-10-11 con las dependencias actuales, **44 MB descomprimido / 20 MB comprimido** (límites de Lambda: 250 MB / 50 MB por subida directa). botocore ocupa 25 MB |
-| Almacenamiento | S3 (bucket `urban-alert-multimedia-images-348364742283`) + CloudFront; DocumentDB 5.0 (`urban-alert-multimedia-docdb`, 1 × db.t4g.medium), base `multimedia`, colección `images` |
+| Almacenamiento | S3 (bucket `urban-alert-multimedia-images-348364742283`, servido directamente); DocumentDB 5.0 (`urban-alert-multimedia-docdb`, 1 × db.t4g.medium), base `multimedia`, colección `images` |
 | Pruebas | pytest unitarias (`tests/unit`) en el runner con Python 3.13; `terraform test` con `mock_provider`; actionlint 1.7.7; shellcheck v0.10.0; prueba de humo contra AWS |
 | Plataforma objetivo | AWS 348364742283, us-east-2; Lambda (512 MB, 15 s) en las subredes privadas de `urban-alert-plataforma` |
 | Restricciones | Rol OIDC compartido que solo confía en `refs/heads/main`; permisos del rol limitados al prefijo `urban-alert-*`; evento síncrono de Lambda ≤ 6 MB; integración del gateway ≤ 30 s |
@@ -55,7 +55,7 @@ La constitución de este repo es la plantilla vacía (versión 0.0.0). Se verifi
 | P1 IaC solo desde Actions | Sí | En local solo `init -backend=false`, `validate`, `test`, `fmt` |
 | P2 Arranque fuera de Terraform | Sí | La nueva política del rol se versiona en `infra/bootstrap/` y se aplica a mano (D-011) |
 | P3 Sin secretos | Sí | OIDC. La URI vive en Secrets Manager y la función solo recibe su ARN (D-006). Las salidas no incluyen la contraseña. La contraseña queda en el estado cifrado, como en Geoespacial |
-| P4 Destructivo solo explícito | Sí | DocumentDB con `deletion_protection` (solo la quita Deprovision); bucket y CloudFront con `prevent_destroy` (D-003) |
+| P4 Destructivo solo explícito | Sí | DocumentDB con `deletion_protection` (solo la quita Deprovision); bucket con `prevent_destroy` (D-003) |
 | P5 Coste mínimo documentado | Sí | Clases mínimas; sin ECR; tabla de costes (§4.6) |
 | P6 Validación antes de commit y apply | Sí | Primer job de Provision; comandos en §2 |
 | P7 Pruebas de lo que protege | Sí | Un `.tftest.hcl` por stack (§9) |
@@ -79,14 +79,14 @@ La constitución de este repo es la plantilla vacía (versión 0.0.0). Se verifi
  │                       └─HTTPS─► endpoint de gateway S3 ─► bucket de imágenes   │
  │  Lambda urban-alert-multimedia-init (índices; la invoca Provision)            │
  └────────────────────────────────────────────────────────────────────────────────┘
- Cliente ──HTTPS GET imageUrl──► CloudFront (OAC) ──► bucket privado (Intelligent-Tiering)
+ Cliente ──HTTPS GET imageUrl──► bucket S3 (lectura anónima de objetos sueltos, Intelligent-Tiering)
 ```
 
 ### 4.2 Stacks y recursos
 
 | Stack | Estado | Recursos | ¿Lo destruye Deprovision? |
 |---|---|---|---|
-| `almacen` | `multimedia/almacen.tfstate` | Bucket con Block Public Access, propiedad del propietario (sin ACL), SSE-S3, política (solo CloudFront por `AWS:SourceArn`; deniega sin TLS), ciclo de vida (Intelligent-Tiering día 0; abortar multipart a 7 días); OAC; distribución (`redirect-to-https`, `CachingOptimized`, `PriceClass_100`) | **Nunca** (`prevent_destroy`) |
+| `almacen` | `multimedia/almacen.tfstate` | Bucket con Block Public Access para ACL (las políticas públicas sí se admiten), propiedad del propietario (sin ACL), SSE-S3, política (lectura anónima de objetos sueltos solo por HTTPS; sin listado ni escritura), ciclo de vida (Intelligent-Tiering día 0; abortar multipart a 7 días). Revisión 1–2: CloudFront + OAC, retirados (D-015) | **Nunca** (`prevent_destroy`) |
 | `base` | `multimedia/base.tfstate` | SG `-lambda` (salida 443 a todo y 27017 al SG de la base); SG `-docdb` (entrada 27017 solo desde el SG `-lambda`); subnet group y grupo de parámetros `docdb5.0` con `tls=enabled`; clúster DocumentDB (cifrado, 7 días de copias, `deletion_protection = !allow_destroy`, copia final) + 1 instancia; `random_password`; secreto `urban-alert-multimedia-docdb` con la URI; roles `urban-alert-multimedia-api` y `urban-alert-multimedia-init` con políticas en línea; grupos de logs `/aws/lambda/urban-alert-multimedia{,-init}` (30 días) | Sí, en 2 pasos (como Geoespacial) |
 | `servicio` | `multimedia/servicio.tfstate` | `aws_lambda_function` del API (`runtime = "python3.13"`, `handler = "app.main.handler"`, `filename = var.paquete_zip`, `source_code_hash = filebase64sha256(...)`, 512 MB, 15 s, VPC, variables §7.2, concurrencia según D-008, etiqueta `Commit`) e `-init` (mismo .zip, `handler = "app.admin.init_resources.handler"`, 60 s) | Sí |
 | `rutas` | `multimedia/rutas.tfstate` | Una integración `AWS_PROXY` (payload `2.0`, función del API), 2 rutas `NONE` y `aws_lambda_permission` para `apigateway.amazonaws.com` limitado a `<api-execution-arn>/*/*/api/v1/multimedia/*` | Sí, el primero |
@@ -100,12 +100,12 @@ Dependencias entre stacks: `base` lee `almacen` (bucket ARN), `servicio` lee `al
 | 0 | **Pruebas y comprobaciones** (job `test`): `pytest tests/unit` (Python 3.13 en el runner); `fmt`, `validate` y `test` de los 4 stacks; actionlint; shellcheck | Nada se toca en AWS si algo falla (HU-1 #2) |
 | 1 | **Paquete** (`scripts/build-lambda-zip.sh` → `build/multimedia.zip`): falla si supera 50 MB comprimido | Se construye antes de tener credenciales: si falla, no se ha tocado nada. Se sube como artefacto del job para el siguiente |
 | 2 | **Plataforma** (`scripts/check-platform.sh`) | La VPC, las subredes, el NAT, el endpoint S3 y el gateway son de la plataforma; si falta, falla antes de cambiar nada |
-| 3 | **`almacen`**: S3 + CloudFront | No depende de nada. Su dominio de CloudFront es la `PUBLIC_IMAGE_BASE_URL` que necesita la función, y su bucket ARN, los permisos del rol |
+| 3 | **`almacen`**: S3 | No depende de nada. Su URL HTTPS es la `PUBLIC_IMAGE_BASE_URL` que necesita la función, y su bucket ARN, los permisos del rol |
 | 4 | **`base`**: red, DocumentDB, secreto, roles, logs | La función necesita el rol, los SG y el secreto. DocumentDB tarda unos 10–15 min solo la primera vez |
 | 5 | **`servicio`**: las dos Lambda con el .zip | Necesitan todo lo de `almacen` y `base` |
 | 6 | **Init** (`scripts/run-init.sh`): `aws lambda invoke` de `-init` → índice `objectKey_unique`; falla si hay `FunctionError` | Índices antes de abrir el tráfico (RF-007); además prueba de punta a punta la red, el secreto y TLS hacia DocumentDB |
 | 7 | **`rutas`**: integración, rutas y permiso | Se publica el servicio solo cuando la función y la base están listas |
-| 8 | **Humo** (`scripts/smoke-gateway-multimedia.sh`): por el gateway, `GET .../images/<uuid aleatorio>/metadata` → `404` (gateway → Lambda → Secrets Manager → DocumentDB) y `GET .../docs` → `404`; por CloudFront, `GET /` → `403` (sin listado); la URL directa del bucket → `403` | Comprueba la cadena completa sin escribir datos en el bucket persistente |
+| 8 | **Humo** (`scripts/smoke-gateway-multimedia.sh`): por el gateway, `GET .../images/<uuid aleatorio>/metadata` → `404` (gateway → Lambda → Secrets Manager → DocumentDB) y `GET .../docs` → `404`; la raíz del bucket (listado) → `403` | Comprueba la cadena completa sin escribir datos en el bucket persistente |
 | 9 | **Resumen**: URL del gateway, URL base de imágenes, SHA, tamaño del paquete, plan de cada stack | Trazabilidad (RNF-008) |
 
 ### 4.4 Orden de desmontaje (Deprovision)
@@ -115,7 +115,7 @@ Se ejecuta solo en `refs/heads/main` y exige escribir `urban-alert-multimedia` c
 1. **`rutas`** → destroy. El gateway deja de enrutar a Multimedia (404), y la plataforma ya no ve rutas ni integraciones de este servicio.
 2. **`servicio`** → destroy, con un .zip vacío como valor de `paquete_zip` (destruir no lo usa). Las ENI de Lambda empiezan a liberarse.
 3. **`base`** → `apply -var allow_destroy=true -var final_snapshot_suffix=<run_id>` (quita la protección) y después `destroy`, que deja la copia final `urban-alert-multimedia-final-<run_id>`. Esperar a que se borre el SG de la función puede tardar 20–40 min (R-6).
-4. **`almacen`**: no se toca (RF-017). El resumen indica que el bucket y CloudFront siguen activos y cómo restaurar la copia (§4.5).
+4. **`almacen`**: no se toca (RF-017). El resumen indica que el bucket sigue activo y cómo restaurar la copia (§4.5).
 
 ### 4.5 Restaurar los metadatos tras reaprovisionar (manual, documentado)
 
@@ -131,7 +131,7 @@ Se restaura `urban-alert-multimedia-final-<run_id>` con `aws docdb restore-db-cl
 | Secrets Manager (1 secreto) | 0,40 USD/mes | 0,40 USD | 0 |
 | Lambda (2 funciones; el .zip lo guarda Lambda sin coste) | 0,20 USD/millón de peticiones + GB-s (capa gratuita) | ~0 | 0 |
 | S3 Intelligent-Tiering | 0,023 → 0,004 USD/GB-mes + 0,0025 USD/1000 objetos | céntimos | céntimos |
-| CloudFront | Capa gratuita: 1 TB y 10 M de peticiones/mes | ~0 | ~0 |
+| Salida de datos de S3 a internet | 100 GB/mes gratis; después 0,09 USD/GB | ~0 | ~0 |
 | CloudWatch Logs (30 días) | 0,50 USD/GB ingerido | ~0 | 0 |
 | **Total** | | **~56 USD** | **céntimos** |
 
@@ -186,7 +186,7 @@ Sin cambios: documento `images` (`_id` = UUID, `objectKey`, `contentType`, `size
 | `POST /api/v1/multimedia/images` | `NONE` | Lambda `urban-alert-multimedia` (payload 2.0, Mangum) |
 | `GET /api/v1/multimedia/images/{imageId}/metadata` | `NONE` | ídem |
 
-Una `imageUrl` inexistente responde `403` en CloudFront: S3 no revela si existe sin `ListBucket`. Se documenta.
+Una `imageUrl` inexistente responde `403` de S3: sin `ListBucket`, S3 no revela si existe. Se documenta.
 
 ### 7.2 Configuración de la función del API
 
@@ -245,9 +245,9 @@ URI guardada en el secreto (cadena simple):
 ### D-003: Persistencia con `prevent_destroy` en un stack que Deprovision no toca
 - **Decisión**: `lifecycle { prevent_destroy = true }` en el bucket y la distribución; Deprovision nunca ejecuta `almacen`.
 - **Alternativas**: dejar el bucket fuera de Terraform (rompe P1); `force_destroy = false` solamente (un bucket vacío sí se borraría).
-- **Motivo**: RF-017. Las `imageUrl` siguen siendo válidas porque el dominio de CloudFront no cambia. Borrarlos exige un commit que quite `prevent_destroy`.
+- **Motivo**: RF-017. Las `imageUrl` siguen siendo válidas porque la URL del bucket no cambia. Borrarlos exige un commit que quite `prevent_destroy`.
 
-### D-004: CloudFront con OAC delante de un bucket privado
+### D-004: CloudFront con OAC delante de un bucket privado — **sustituida por D-015**
 - **Decisión**: ver R-3. Sin ACL, Block Public Access completo y política solo para la distribución.
 - **Motivo**: RF-002 y HU-4 #1; sin coste por hora.
 
@@ -318,6 +318,12 @@ URI guardada en el secreto (cadena simple):
 - **Alternativa**: seguir ejecutando `compose --profile test` en CI (mantener el entorno local que el usuario descartó).
 - **Motivo**: RF-016 eliminado.
 
+### D-015: Imágenes servidas directamente por S3, sin CloudFront (revisión 3)
+- **Contexto**: el Provision 38117129527 creó el bucket, pero CloudFront respondió `AccessDenied: Your account must be verified before you can add new CloudFront resources`. Es una restricción de cuentas nuevas que solo levanta AWS Support; no es un permiso de IAM.
+- **Decisión** (del usuario): sin CloudFront. El bucket admite lectura anónima (`s3:GetObject` para `*` sobre `bucket/*`, solo con TLS), como MinIO en local; `imageUrl` = `https://<bucket>.s3.us-east-2.amazonaws.com/<uuid>.<ext>`. Block Public Access sigue bloqueando ACL (`block_public_acls`, `ignore_public_acls`), pero admite la política pública (`block_public_policy = false`, `restrict_public_buckets = false`). Se eliminan la OAC ya creada y la distribución.
+- **Alternativas**: verificar la cuenta y mantener CloudFront (sin fecha y fuera del control del equipo); URL prefirmadas (caducan: incumplen la `imageUrl` definitiva).
+- **Consecuencias**: sin caché ni CDN (prototipo, poco tráfico); salida de datos de S3 a 0,09 USD/GB a partir de 100 GB/mes. Añadir CloudFront después cambiaría la URL base y rompería las `imageUrl` guardadas. El bloque `CloudFrontImages` de la política de bootstrap queda sin uso, pero se conserva porque el JSON refleja lo aplicado en AWS. Si la cuenta tiene activado Block Public Access **a nivel de cuenta**, `PutBucketPolicy` fallará y habrá que desactivar en la cuenta las dos opciones de políticas (lo hace un administrador).
+
 ## 9. Estrategia de pruebas
 
 | Nivel | Qué | Comando |
@@ -325,7 +331,7 @@ URI guardada en el secreto (cadena simple):
 | Unitarias (nuevas) | `resolve_uri` con y sin ARN (cliente de Secrets Manager simulado con `monkeypatch`; caché; error → `MetadataStoreError`); el `handler` de init crea `objectKey_unique` sobre una colección falsa y no llama a S3; `Settings` lee `MONGODB_URI_SECRET_ARN` | `pytest tests/unit` |
 | Unitarias existentes | Formato, captura, limpieza de metadatos, handler con eventos de API Gateway, configuración y logs: siguen pasando | `pytest tests/unit` |
 | Paquete | El script falla si supera 50 MB; dos construcciones seguidas dan el mismo `sha256` | `scripts/build-lambda-zip.sh` dos veces + `sha256sum` (manual en la tarea y en CI vía resumen) |
-| Terraform `almacen` | Bucket privado (Block Public Access ×4, sin ACL), política solo para la distribución + denegar sin TLS, regla Intelligent-Tiering día 0 sin niveles de archivo, `redirect-to-https`, OAC firmado, prefijo de nombre | `terraform test` |
+| Terraform `almacen` | ACL bloqueadas y políticas públicas admitidas; política con una sola sentencia `Allow` (`s3:GetObject` para `*` sobre `bucket/*`, nunca `ListBucket` ni escritura) + denegar sin TLS; regla Intelligent-Tiering día 0 sin niveles de archivo; `image_base_url` = URL HTTPS del bucket; prefijo de nombre | `terraform test` |
 | Terraform `base` | Protección por defecto (`deletion_protection`, sin `skip_final_snapshot`); con `allow_destroy` se levanta y la copia se llama `…-final-<suffix>`; DocumentDB cifrado, 7 días de copias y TLS por parámetro; SG de la base solo desde el SG de la función y solo 27017; red de la plataforma desde SSM; la URI contiene `tls=true`, la ruta de la CA y `retryWrites=false`; secreto recreable (`recovery_window_in_days = 0`); el rol del API solo tiene `PutObject`/`DeleteObject` sobre su bucket y el de init no tiene S3; prefijo `urban-alert-` | `terraform test` |
 | Terraform `servicio` | `python3.13`, x86_64, handlers correctos; las dos en las subredes y el SG de `base`; 512 MB / 15 s; sin `AWS_ENDPOINT_URL_S3` ni `MONGODB_URI` y con `MONGODB_URI_SECRET_ARN`; `PUBLIC_IMAGE_BASE_URL` = CloudFront; `MONGODB_MAX_POOL_SIZE = 2`; sin concurrencia reservada por defecto; etiqueta `Commit` | `terraform test` |
 | Terraform `rutas` | Exactamente las 2 rutas, `NONE`, `AWS_PROXY` 2.0 hacia la función, sin `$default`; `source_arn` limitado a `/api/v1/multimedia/*`; gateway leído de SSM | `terraform test` |
@@ -352,7 +358,7 @@ URI guardada en el secreto (cadena simple):
 | Requisito | Componentes | Pruebas |
 |---|---|---|
 | RF-001 | `servicio` (función del API), `build-lambda-zip.sh` | tftest `servicio`; paquete; humo |
-| RF-002 | `almacen` (bucket, OAC, CloudFront); `PUBLIC_IMAGE_BASE_URL` | tftest `almacen`, `servicio`; humo (S3 directo → 403) |
+| RF-002 | `almacen` (bucket y su política); `PUBLIC_IMAGE_BASE_URL` | tftest `almacen`, `servicio`; humo (listado → 403) |
 | RF-003 | `base` (DocumentDB, SG, parámetros TLS), CA en el paquete | tftest `base`; init (paso 6) |
 | RF-004 | `base` (secreto), `resolve_uri`, `MONGODB_URI_SECRET_ARN` | unitaria `test_metadata_uri`; tftest `servicio` (sin `MONGODB_URI`) |
 | RF-005 | `rutas` | tftest `rutas`; humo |

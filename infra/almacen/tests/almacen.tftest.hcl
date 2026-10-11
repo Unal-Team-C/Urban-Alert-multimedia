@@ -14,21 +14,9 @@ mock_provider "aws" {
       bucket_regional_domain_name = "urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com"
     }
   }
-
-  mock_resource "aws_cloudfront_distribution" {
-    defaults = {
-      id          = "E2MOCK"
-      arn         = "arn:aws:cloudfront::348364742283:distribution/E2MOCK"
-      domain_name = "d111111abcdef8.cloudfront.net"
-    }
-  }
-
-  mock_resource "aws_cloudfront_origin_access_control" {
-    defaults = { id = "E3OACMOCK" }
-  }
 }
 
-run "bucket_is_private_and_encrypted" {
+run "bucket_is_encrypted_without_acls" {
   command = plan
 
   assert {
@@ -39,11 +27,9 @@ run "bucket_is_private_and_encrypted" {
   assert {
     condition = (
       aws_s3_bucket_public_access_block.images.block_public_acls &&
-      aws_s3_bucket_public_access_block.images.ignore_public_acls &&
-      aws_s3_bucket_public_access_block.images.block_public_policy &&
-      aws_s3_bucket_public_access_block.images.restrict_public_buckets
+      aws_s3_bucket_public_access_block.images.ignore_public_acls
     )
-    error_message = "Every Block Public Access option must be on (RF-002, RNF-001)."
+    error_message = "ACLs must stay blocked: public read only comes from the bucket policy (plan D-015)."
   }
 
   assert {
@@ -57,22 +43,18 @@ run "bucket_is_private_and_encrypted" {
   }
 }
 
-run "only_the_distribution_reads_and_tls_is_required" {
+run "anyone_reads_single_objects_but_nobody_lists_or_writes" {
   command = plan
 
   assert {
-    condition = (
-      jsondecode(aws_s3_bucket_policy.images.policy).Statement[0].Effect == "Allow" &&
-      jsondecode(aws_s3_bucket_policy.images.policy).Statement[0].Principal.Service == "cloudfront.amazonaws.com" &&
-      jsondecode(aws_s3_bucket_policy.images.policy).Statement[0].Action == "s3:GetObject" &&
-      jsondecode(aws_s3_bucket_policy.images.policy).Statement[0].Condition.StringEquals["AWS:SourceArn"] == "arn:aws:cloudfront::348364742283:distribution/E2MOCK"
-    )
-    error_message = "Only the CloudFront distribution may read objects (no listing, no public read)."
-  }
-
-  assert {
-    condition     = length([for s in jsondecode(aws_s3_bucket_policy.images.policy).Statement : s if s.Effect == "Allow"]) == 1
-    error_message = "The bucket policy must allow nothing else."
+    condition = [for st in jsondecode(aws_s3_bucket_policy.images.policy).Statement : st if st.Effect == "Allow"] == [{
+      Sid       = "PublicReadSingleObjects"
+      Effect    = "Allow"
+      Principal = "*"
+      Action    = "s3:GetObject"
+      Resource  = "arn:aws:s3:::urban-alert-multimedia-images-348364742283/*"
+    }]
+    error_message = "The only grant is the anonymous read of single objects: no ListBucket, no writes (RF-002, HU-4 #1)."
   }
 
   assert {
@@ -81,6 +63,11 @@ run "only_the_distribution_reads_and_tls_is_required" {
       jsondecode(aws_s3_bucket_policy.images.policy).Statement[1].Condition.Bool["aws:SecureTransport"] == "false"
     )
     error_message = "Requests without TLS must be denied."
+  }
+
+  assert {
+    condition     = output.image_base_url == "https://urban-alert-multimedia-images-348364742283.s3.us-east-2.amazonaws.com"
+    error_message = "image_base_url must be the HTTPS URL of the bucket (PUBLIC_IMAGE_BASE_URL)."
   }
 }
 
@@ -103,34 +90,6 @@ run "images_move_to_intelligent_tiering_from_day_zero" {
       ]
     ]))
     error_message = "No transition to a class that needs a restore before reading (Glacier Flexible, Deep Archive)."
-  }
-}
-
-run "cdn_serves_https_through_the_access_control" {
-  command = plan
-
-  assert {
-    condition     = aws_cloudfront_distribution.images.default_cache_behavior[0].viewer_protocol_policy == "redirect-to-https"
-    error_message = "Images must be served over HTTPS."
-  }
-
-  assert {
-    condition     = toset(aws_cloudfront_distribution.images.default_cache_behavior[0].allowed_methods) == toset(["GET", "HEAD"])
-    error_message = "The CDN is read-only."
-  }
-
-  assert {
-    condition = (
-      one(aws_cloudfront_distribution.images.origin).origin_access_control_id == "E3OACMOCK" &&
-      aws_cloudfront_origin_access_control.images.signing_behavior == "always" &&
-      aws_cloudfront_origin_access_control.images.origin_access_control_origin_type == "s3"
-    )
-    error_message = "CloudFront must sign every origin request with its origin access control."
-  }
-
-  assert {
-    condition     = output.cdn_url == "https://d111111abcdef8.cloudfront.net"
-    error_message = "cdn_url must be the HTTPS URL of the distribution (PUBLIC_IMAGE_BASE_URL)."
   }
 }
 

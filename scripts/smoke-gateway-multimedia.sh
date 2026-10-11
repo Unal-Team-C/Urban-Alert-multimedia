@@ -3,14 +3,12 @@
 #   1. GET metadata of a random id through the gateway → the service's own 404 (gateway → Lambda → Secrets Manager
 #      → DocumentDB works; the gateway's 404 for unknown routes has another body).
 #   2. GET /api/v1/multimedia/docs → 404 (only the two routes are published).
-#   3. GET <cdn>/ → 403 (no listing) and the bucket URL without CloudFront → 403 (private bucket).
-# Usage: scripts/smoke-gateway-multimedia.sh <gateway-url> <cdn-url> <bucket-name> <region>
+#   3. GET <image-base-url>/ → 403 (anonymous listing denied) and an unknown key → 403 (plan D-015).
+# Usage: scripts/smoke-gateway-multimedia.sh <gateway-url> <image-base-url>
 set -euo pipefail
 
-GATEWAY=${1:?usage: smoke-gateway-multimedia.sh <gateway-url> <cdn-url> <bucket-name> <region>}
-CDN=${2:?missing cdn-url}
-BUCKET=${3:?missing bucket-name}
-REGION=${4:?missing region}
+GATEWAY=${1:?usage: smoke-gateway-multimedia.sh <gateway-url> <image-base-url>}
+IMAGES=${2:?missing image-base-url}
 PREFIX="$GATEWAY/api/v1/multimedia"
 BODY=$(mktemp)
 trap 'rm -f "$BODY"' EXIT
@@ -48,8 +46,8 @@ else
 fi
 
 expect "unpublished route /docs" 404 "$PREFIX/docs"
-expect "CloudFront without a key (no listing)" 403 "$CDN/"
-expect "bucket without CloudFront (private)" 403 "https://$BUCKET.s3.$REGION.amazonaws.com/$id.jpg"
+expect "anonymous listing of the images bucket" 403 "$IMAGES/"
+expect "unknown image key" 403 "$IMAGES/$id.jpg"
 
 if [ "$failures" -gt 0 ]; then
   echo "Smoke test failed: $failures check(s)."
