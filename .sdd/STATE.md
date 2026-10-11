@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T007
+tarea_actual: T008
 estado_tarea: -
 
 ## Siguiente paso
 
-T007: escribir scripts/build-lambda-zip.sh (wheels manylinux2014_x86_64/cp313, --no-compile, app/ sin __pycache__, CA en certs/, fechas fijas, orden estable, máx. 50 MB, imprime tamaño y sha256).
+T008: crear infra/almacen (bucket privado + política OAC/TLS + ciclo de vida Intelligent-Tiering + OAC + CloudFront, prevent_destroy) con tests/almacen.tftest.hcl y lockfile de 3 plataformas.
 
 ## Contexto de trabajo
 

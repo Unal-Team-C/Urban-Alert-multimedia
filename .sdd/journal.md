@@ -75,3 +75,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T006 hecha
 - app/admin/init_resources.py: handler(event, context) crea los índices (sin S3) y devuelve sus nombres; ensure_indexes devuelve la lista. main() local sin cambios.
 - Verificado: 57 unitarias en verde.
+
+## 2026-10-11 · 002-despliegue-aws · T007 hecha
+- scripts/build-lambda-zip.sh: wheels manylinux2014_x86_64/cp313 (--no-compile), app/, CA de DocumentDB en certs/, sin __pycache__, permisos y fechas fijos, entradas ordenadas (zip -X -D), falla si > 50 MB.
+- Verificado: dos builds seguidos → mismo sha256 (ad71e946…); 21,3 MB comprimido / 37,9 MB, 2979 archivos; contiene app/main.py, certs/global-bundle.pem, pydantic_core; sin __pycache__; importa app.main, init_resources, pydantic_core y pymongo en python:3.13 amd64; shellcheck sin avisos.
