@@ -66,3 +66,8 @@
 ## 2026-10-11 · 002-despliegue-aws · T004 hecha
 - tests/unit/test_init_handler.py: el handler crea objectKey_unique sobre una colección falsa y no llama a client_for (S3).
 - Verificado: falla con AttributeError (handler no existe).
+
+## 2026-10-11 · 002-despliegue-aws · T005 hecha
+- app/config.py: mongodb_uri_secret_arn. app/storage/metadata.py: secrets_client y resolve_uri (lru_cache sobre Settings congelado; fallos no cacheados → MetadataStoreError), collection_for usa resolve_uri, MetadataStore resuelve la colección en cada uso (un fallo del secreto da 503 y no 500 al construir la dependencia).
+- Firma de MetadataStore(settings, uri=None) sin cambios: las pruebas de integración siguen siendo compatibles.
+- Verificado: 56 unitarias en verde; solo falla test_init_handler (T006).

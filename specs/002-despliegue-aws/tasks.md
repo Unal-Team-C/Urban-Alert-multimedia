@@ -30,7 +30,7 @@ Atajos de verificación (Podman, desde la raíz del repo; ver plan §2):
 
 ### Código
 
-- [ ] T005 Implementar `mongodb_uri_secret_arn` y `resolve_uri` (Secrets Manager con `lru_cache`, error → `MetadataStoreError`) y usarlo en `collection_for` — archivos: app/config.py, app/storage/metadata.py — cubre: RF-004 — depende: T003 — verifica: `PYTEST` en verde
+- [x] T005 Implementar `mongodb_uri_secret_arn` y `resolve_uri` (Secrets Manager con `lru_cache`, error → `MetadataStoreError`) y usarlo en `collection_for` — archivos: app/config.py, app/storage/metadata.py — cubre: RF-004 — depende: T003 — verifica: `PYTEST` en verde
 - [ ] T006 Implementar `handler(event, context)` de init (solo índices; `main()` sin cambios) — archivos: app/admin/init_resources.py — cubre: RF-007 — depende: T004 — verifica: `PYTEST` en verde
 - [ ] T007 Escribir el script del paquete .zip determinista (wheels manylinux2014_x86_64/cp313, `--no-compile`, `app/` sin `__pycache__`, CA de DocumentDB en `certs/`, fechas fijas, orden estable, falla si > 50 MB, imprime tamaño y sha256) — archivos: scripts/build-lambda-zip.sh — cubre: RF-001, RNF-003 — depende: T005, T006 — verifica: dos ejecuciones seguidas en `python:3.13-slim` dan el mismo sha256; tamaño < 50 MB; `unzip -l` contiene `app/main.py`, `certs/global-bundle.pem`, `pydantic_core/`
 

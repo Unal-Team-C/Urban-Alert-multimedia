@@ -2,6 +2,8 @@
 
 S3 endpoint and credentials are not here: boto3 reads AWS_ENDPOINT_URL_S3, AWS_REGION and
 AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY natively, so the cloud deployment just omits them (plan D-005).
+In AWS the MongoDB URI is not an env var either: MONGODB_URI_SECRET_ARN points to it in Secrets Manager
+(spec 002 RF-004, plan D-006).
 """
 
 import os
@@ -19,6 +21,7 @@ class Settings:
     s3_addressing_style: str = "auto"
     public_image_base_url: str = "http://localhost:9000/urbanalert-images"
     mongodb_uri: str = "mongodb://localhost:27017"
+    mongodb_uri_secret_arn: str = ""
     mongodb_database: str = "multimedia"
     mongodb_timeout_ms: int = 3000
     mongodb_max_pool_size: int = 5

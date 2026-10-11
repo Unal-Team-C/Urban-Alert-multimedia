@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T005
+tarea_actual: T006
 estado_tarea: -
 
 ## Siguiente paso
 
-T005: añadir mongodb_uri_secret_arn a Settings; resolve_uri (lru_cache sobre Settings congelado, secrets_client cacheado, error → MetadataStoreError) y MetadataStore perezoso en app/storage/metadata.py.
+T006: añadir handler(event, context) en app/admin/init_resources.py (solo índices); ensure_indexes devuelve los nombres.
 
 ## Contexto de trabajo
 
