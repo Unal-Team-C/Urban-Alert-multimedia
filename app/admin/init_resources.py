@@ -1,7 +1,10 @@
 """One-off admin process (12-factor XII, plan D-010): bucket, bucket policy and Mongo indexes.
 
-Idempotent. Run by the `init` compose service before the function starts:
+Idempotent. Locally, run by the `init` compose service before the function starts:
     python -m app.admin.init_resources
+In AWS, `handler` runs as the function urban-alert-multimedia-init, invoked by the Provision workflow before
+the gateway routes are published. It only creates the indexes: the bucket and its policy belong to Terraform
+(spec 002 RF-007, plan D-007).
 """
 
 import json
@@ -43,8 +46,8 @@ def ensure_bucket(s3, bucket: str) -> None:
     s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(bucket_policy(bucket)))
 
 
-def ensure_indexes(collection) -> None:
-    collection.create_index("objectKey", unique=True, name="objectKey_unique")
+def ensure_indexes(collection) -> list[str]:
+    return [collection.create_index("objectKey", unique=True, name="objectKey_unique")]
 
 
 def ensure_all(settings: Settings) -> None:
@@ -60,6 +63,15 @@ def main() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
     ensure_all(settings)
+
+
+def handler(event, context) -> dict:
+    """Lambda entry point (urban-alert-multimedia-init)."""
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    indexes = ensure_indexes(collection_for(settings))
+    logger.info("indexes ready", extra={"fields": {"database": settings.mongodb_database, "indexes": indexes}})
+    return {"indexes": indexes}
 
 
 if __name__ == "__main__":

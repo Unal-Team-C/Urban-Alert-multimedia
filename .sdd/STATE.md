@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T006
+tarea_actual: T007
 estado_tarea: -
 
 ## Siguiente paso
 
-T006: añadir handler(event, context) en app/admin/init_resources.py (solo índices); ensure_indexes devuelve los nombres.
+T007: escribir scripts/build-lambda-zip.sh (wheels manylinux2014_x86_64/cp313, --no-compile, app/ sin __pycache__, CA en certs/, fechas fijas, orden estable, máx. 50 MB, imprime tamaño y sha256).
 
 ## Contexto de trabajo
 
