@@ -6,7 +6,7 @@
      estado_tarea: - | en_progreso | hecha | bloqueada -->
 
 feature_activa: 002-despliegue-aws
-fase: implement
+fase: verify
 tarea_actual: T017
 estado_tarea: hecha
 
