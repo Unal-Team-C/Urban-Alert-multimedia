@@ -7,15 +7,17 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T008
+tarea_actual: T009
 estado_tarea: -
 
 ## Siguiente paso
 
-T008: crear infra/almacen (bucket privado + política OAC/TLS + ciclo de vida Intelligent-Tiering + OAC + CloudFront, prevent_destroy) con tests/almacen.tftest.hcl y lockfile de 3 plataformas.
+T009: crear infra/base parte de red y datos (SSM, SG lambda/docdb, subnet group, parámetros docdb5.0 tls, clúster + instancia db.t4g.medium, random_password, secreto con URI) y tests/base.tftest.hcl.
 
 ## Contexto de trabajo
 
+- Terraform: wrapper `$SCRATCHPAD/tf` (podman hashicorp/terraform:1.16.5 + caché de proveedores en el volumen tf-plugin-cache). Lockfile: `init -backend=false` + `providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_arm64`.
+- Tests de stacks con `prevent_destroy`: solo `command = plan` + `mock_provider { override_during = plan }` (las runs apply se destruyen al final y prevent_destroy lo impide).
 - Pruebas unitarias rápidas: imagen local `mm-unit` (python:3.13-slim + requirements-dev + zip/unzip/curl). `podman run --rm -v "$PWD":/w -w /w mm-unit pytest -q tests/unit`. Reconstruir si cambian los requirements.
 - Numerada 002 porque el README cita specs/001-servicio-multimedia (no está versionada en el repo).
 

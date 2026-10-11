@@ -79,3 +79,8 @@
 ## 2026-10-11 · 002-despliegue-aws · T007 hecha
 - scripts/build-lambda-zip.sh: wheels manylinux2014_x86_64/cp313 (--no-compile), app/, CA de DocumentDB en certs/, sin __pycache__, permisos y fechas fijos, entradas ordenadas (zip -X -D), falla si > 50 MB.
 - Verificado: dos builds seguidos → mismo sha256 (ad71e946…); 21,3 MB comprimido / 37,9 MB, 2979 archivos; contiene app/main.py, certs/global-bundle.pem, pydantic_core; sin __pycache__; importa app.main, init_resources, pydantic_core y pymongo en python:3.13 amd64; shellcheck sin avisos.
+
+## 2026-10-11 · 002-despliegue-aws · T008 hecha
+- infra/almacen: bucket urban-alert-multimedia-images-<cuenta> (Block Public Access ×4, BucketOwnerEnforced, SSE-S3, prevent_destroy), ciclo de vida (Intelligent-Tiering día 0; multipart a 7 días), OAC sigv4, CloudFront (redirect-to-https, GET/HEAD, CachingOptimized, PriceClass_100, prevent_destroy), política (solo la distribución por AWS:SourceArn + denegar sin TLS), salidas bucket_name/arn, cdn_domain/url, distribution_id. Lockfile de 3 plataformas.
+- Tests solo de plan (prevent_destroy impide destruir runs apply), con override_during = plan.
+- Verificado: validate ok, fmt ok, 5/5 runs; mutación (GLACIER) hace fallar la run de ciclo de vida.
