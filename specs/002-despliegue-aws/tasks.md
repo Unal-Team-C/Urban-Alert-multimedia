@@ -23,7 +23,7 @@ Atajos de verificación (Podman, desde la raíz del repo; ver plan §2):
 
 ## Fase 2: Pruebas (antes del código)
 
-- [ ] T003 Escribir pruebas unitarias de `MONGODB_URI_SECRET_ARN` y `resolve_uri` (sin ARN usa `MONGODB_URI`; con ARN lee el secreto con un cliente simulado y lo cachea; un error del cliente lanza `MetadataStoreError`) — archivos: tests/unit/test_metadata_uri.py, tests/unit/test_config_logging.py — cubre: RF-004 — verifica: `PYTEST` falla solo en las pruebas nuevas (ImportError/AttributeError de `resolve_uri`)
+- [x] T003 Escribir pruebas unitarias de `MONGODB_URI_SECRET_ARN` y `resolve_uri` (sin ARN usa `MONGODB_URI`; con ARN lee el secreto con un cliente simulado y lo cachea; un error del cliente lanza `MetadataStoreError`) — archivos: tests/unit/test_metadata_uri.py, tests/unit/test_config_logging.py — cubre: RF-004 — verifica: `PYTEST` falla solo en las pruebas nuevas (ImportError/AttributeError de `resolve_uri`)
 - [ ] T004 [P] Escribir prueba unitaria del handler de init (crea `objectKey_unique` sobre una colección falsa, no crea cliente S3, devuelve los índices) — archivos: tests/unit/test_init_handler.py — cubre: RF-007 — verifica: `PYTEST` falla solo en esa prueba (`handler` no existe)
 
 ## Fase 3: Núcleo

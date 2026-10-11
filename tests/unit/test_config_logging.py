@@ -11,6 +11,7 @@ def test_defaults_match_plan():
     assert settings.multipart_overhead_bytes == 65_536
     assert settings.enable_docs is False
     assert settings.mongodb_max_pool_size == 5
+    assert settings.mongodb_uri_secret_arn == ""
 
 
 def test_from_env_overrides_and_parses_types(monkeypatch):
@@ -25,6 +26,12 @@ def test_from_env_overrides_and_parses_types(monkeypatch):
     assert settings.storage_read_timeout_s == 7.5
     assert settings.s3_bucket == "other-bucket"
     assert settings.public_image_base_url == "http://cdn.example/images"
+
+
+def test_from_env_reads_the_mongodb_secret_arn(monkeypatch):
+    arn = "arn:aws:secretsmanager:us-east-2:348364742283:secret:urban-alert-multimedia-docdb-AbCdEf"
+    monkeypatch.setenv("MONGODB_URI_SECRET_ARN", arn)
+    assert Settings.from_env().mongodb_uri_secret_arn == arn
 
 
 def _format(message, fields=None):

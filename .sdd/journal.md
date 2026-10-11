@@ -58,3 +58,7 @@
 
 ## 2026-10-11 · 002-despliegue-aws · T002 hecha
 - .gitignore: build/, .terraform/, planes de Terraform. Verificado con git check-ignore.
+
+## 2026-10-11 · 002-despliegue-aws · T003 hecha
+- tests/unit/test_metadata_uri.py (4 pruebas: sin ARN, con ARN y caché, error no cacheado → MetadataStoreError, MetadataStore perezoso) y 2 asserts nuevos en test_config_logging.py.
+- Verificado: fallan solo las nuevas (ImportError de resolve_uri; AttributeError de mongodb_uri_secret_arn); 50 existentes en verde.
