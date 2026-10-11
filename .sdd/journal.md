@@ -121,3 +121,7 @@
 ## 2026-10-11 · 002-despliegue-aws · T017 hecha
 - Validación local completa en verde: 57 unitarias; Terraform almacen 5/5, base 10/10, servicio 6/6, rutas 3/3 con -lockfile=readonly; fmt; actionlint; shellcheck; doble build del .zip idéntico (21,3 MB).
 - notes.md: resultados y lista de 10 comprobaciones en AWS (HU-1…HU-4, ciclo Deprovision → Provision) para /sdd-verify. RNF-004/RNF-005 solo se pueden medir en AWS.
+
+## 2026-10-11 · 002-despliegue-aws · T018 hecha (corrección)
+- Primer Provision (run 38116975110) falló en el job package: `zip error: Could not create output file (build/multimedia.zip)`. El script hacía `cd` a build/pkg antes de zip y la ruta de salida era relativa. En local solo se probó la ruta por defecto (absoluta). Nada se creó en AWS.
+- Corrección: la salida se convierte en ruta absoluta antes de construir. Verificado con la ruta relativa del workflow: mismo sha256 (ad71e946…); shellcheck sin avisos.

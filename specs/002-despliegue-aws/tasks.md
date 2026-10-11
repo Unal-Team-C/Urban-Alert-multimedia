@@ -57,6 +57,8 @@ Atajos de verificación (Podman, desde la raíz del repo; ver plan §2):
 
 <!-- /sdd-verify añade aquí tareas si detecta fallos -->
 
+- [x] T018 Corregir build-lambda-zip.sh con una ruta de salida relativa (falló el primer Provision, run 38116975110: `zip error: Could not create output file (build/multimedia.zip)`, porque zip se ejecuta dentro de build/pkg) — archivos: scripts/build-lambda-zip.sh — cubre: RF-001, RF-010 — verifica: `scripts/build-lambda-zip.sh build/multimedia.zip` (ruta relativa, como en el workflow) genera el .zip con el mismo sha256; shellcheck sin avisos
+
 ## Cobertura
 
 | Requisito | Tareas |

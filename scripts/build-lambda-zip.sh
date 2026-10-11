@@ -12,8 +12,11 @@ PKG="$ROOT/build/pkg"
 MAX_BYTES=52428800
 CA_URL="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
 
+mkdir -p "$(dirname "$OUT")"
+# Absolute: zip runs from inside the package directory.
+OUT="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
 rm -rf "$PKG" "$OUT"
-mkdir -p "$PKG/certs" "$(dirname "$OUT")"
+mkdir -p "$PKG/certs"
 
 # Binary wheels built for Lambda (manylinux, CPython 3.13, x86_64), whatever the machine running the build.
 # --no-compile: .pyc files embed timestamps and would change the hash on every build.

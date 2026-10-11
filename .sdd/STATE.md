@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: verify
-tarea_actual: T017
+tarea_actual: T018
 estado_tarea: hecha
 
 ## Siguiente paso
 
-Todas las tareas hechas. Siguiente: aplicar la política de bootstrap, hacer push a main (lo decide el usuario) y /sdd-verify con la lista de notes.md.
+Vigilar el Provision relanzado por el push de T018 (corrección de la ruta del .zip); si pasa, /sdd-verify con la lista de notes.md.
 
 ## Contexto de trabajo
 
