@@ -7,12 +7,12 @@
 
 feature_activa: 002-despliegue-aws
 fase: implement
-tarea_actual: T009
+tarea_actual: T010
 estado_tarea: -
 
 ## Siguiente paso
 
-T009: crear infra/base parte de red y datos (SSM, SG lambda/docdb, subnet group, parámetros docdb5.0 tls, clúster + instancia db.t4g.medium, random_password, secreto con URI) y tests/base.tftest.hcl.
+T010: completar infra/base con iam.tf (roles -api e -init, políticas en línea) y logs.tf (grupos /aws/lambda de 30 días), leyendo almacen con terraform_remote_state; tests de mínimo privilegio.
 
 ## Contexto de trabajo
 

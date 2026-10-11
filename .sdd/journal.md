@@ -84,3 +84,7 @@
 - infra/almacen: bucket urban-alert-multimedia-images-<cuenta> (Block Public Access ×4, BucketOwnerEnforced, SSE-S3, prevent_destroy), ciclo de vida (Intelligent-Tiering día 0; multipart a 7 días), OAC sigv4, CloudFront (redirect-to-https, GET/HEAD, CachingOptimized, PriceClass_100, prevent_destroy), política (solo la distribución por AWS:SourceArn + denegar sin TLS), salidas bucket_name/arn, cdn_domain/url, distribution_id. Lockfile de 3 plataformas.
 - Tests solo de plan (prevent_destroy impide destruir runs apply), con override_during = plan.
 - Verificado: validate ok, fmt ok, 5/5 runs; mutación (GLACIER) hace fallar la run de ciclo de vida.
+
+## 2026-10-11 · 002-despliegue-aws · T009 hecha
+- infra/base: SSM de la plataforma, SG -lambda (salida 443 a todo, 27017 al SG -docdb) y -docdb (entrada 27017 solo desde -lambda), subnet group, grupo de parámetros docdb5.0 con tls=enabled, clúster 5.0.0 cifrado (7 días, deletion_protection = !allow_destroy, copia final -final-<suffix>, apply_immediately) + 1 instancia db.t4g.medium, random_password, secreto -docdb con la URI (tls, tlsCAFile=/var/task/certs/global-bundle.pem, replicaSet=rs0, retryWrites=false; recovery 0). La URI deriva de random_password (sensible): no sale en planes ni salidas.
+- Verificado: validate, fmt, 8/8 runs.
