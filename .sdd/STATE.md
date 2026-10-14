@@ -3,7 +3,7 @@
 <!-- Puntero de reanudación. Claude lo actualiza en CADA transición (inicio/fin de tarea, cambio de fase, decisión, bloqueo).
      Editar este archivo = checkpoint (lo registra el hook). Mantenlo corto: el detalle va en specs/ y journal.md.
      fase: constitution | specify | clarify | plan | tasks | implement | verify | done
-     estado_tarea: en_progreso
+     estado_tarea: hecha
 
 feature_activa: 002-despliegue-aws
 fase: verify
@@ -12,7 +12,7 @@ estado_tarea: hecha
 
 ## Siguiente paso
 
-Push de T019–T020 y vigilar el Provision; si pasa, /sdd-verify con notes.md.
+Servicio desplegado (Provision 38117564842 en verde). Siguiente: /sdd-verify con la lista de specs/002-despliegue-aws/notes.md (subida real, relanzar el mismo commit → 0 cambios, ciclo Deprovision → Provision).
 
 ## Contexto de trabajo
 
