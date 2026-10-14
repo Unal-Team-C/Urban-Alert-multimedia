@@ -7,6 +7,8 @@ name: Provision
 on:
   push:
     branches: [main]
+  # Also run by the Reanudar workflow of urban-alert-plataforma after a pause.
+  workflow_dispatch:
 
 # Shared with deprovision.yml: runs touching the same infrastructure queue up instead of overlapping (RF-014).
 concurrency:
@@ -115,6 +117,23 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # While the platform is paused (no NAT, databases stopped) a deployment would fail half-way: refuse it.
+      - name: Refuse to deploy while the platform is paused
+        run: |
+          err="$(mktemp)"
+          if pausada="$(aws ssm get-parameter --name /urban-alert/plataforma/pausada --query Parameter.Value --output text 2>"$err")"; then
+            :
+          elif grep -q ParameterNotFound "$err"; then
+            pausada=false
+          else
+            cat "$err" >&2
+            exit 1
+          fi
+          if [ "$pausada" = "true" ]; then
+            echo "::error::The platform is paused: run Reanudar in Unal-Team-C/urban-alert-plataforma (it runs this Provision). Nothing was changed."
+            exit 1
+          fi
+
       - name: Check the shared platform is provisioned (nothing is changed before this)
         run: scripts/check-platform.sh
 
@@ -133,6 +152,10 @@ jobs:
           {
             echo "image_base_url=$(terraform -chdir=infra/almacen output -raw image_base_url)"
           } >> "$GITHUB_OUTPUT"
+
+      # After a pause the cluster is stopped; the base stack and the init function need it running.
+      - name: Start DocumentDB if it is stopped (after a pause)
+        run: scripts/docdb-estado.sh arrancar urban-alert-multimedia-docdb
 
       - name: Apply base (DocumentDB, secret, security groups, roles, logs)
         run: |

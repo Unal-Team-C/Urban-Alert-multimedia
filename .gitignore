@@ -5,3 +5,6 @@ build/
 .terraform/
 *.tfplan
 tfplan
+
+# macOS
+.DS_Store
